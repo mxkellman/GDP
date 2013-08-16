@@ -1,0 +1,79 @@
+// Color Palette			
+// ---------------------	-----------------------------
+$black:						#111111;
+$white:						#ffffff;
+$blue:						#2C4F73;
+$green:						#115500;
+$red:						#690000;
+$yellow:					#B9A954;
+
+
+// Color Spec					
+// ---------------------	-----------------------------
+$bodyColor:					$white;
+$textColor:					$black;  
+$headerColor:				$black;
+$linkColor:					$blue;  
+$linkHoverColor:			$textColor;
+
+// Typography				
+// ---------------------	-----------------------------
+// Font sizes based on the golden ratio 
+// http://modularscale.com/scale/?px1=14&px2=30&ra1=1.618&ra2=0
+// Starting sizes: 14 and [30]
+// [7], 9, [11], 14, [18.5], 23, [30], 37
+
+$fontFamily:				"Helvetica Neue", "Helvetica", Arial, sans-serif;
+$fontFamilyHeader:			$fontFamily;
+
+
+$fontSizeXS:				9px;
+$fontSizeS:					12px;
+$fontSizeM:					15px;
+$fontSizeL:					19px;
+$fontSizeXL:				24px;
+$fontSizeXXL:				31px;
+$fontSizeXXXL:				39px;
+
+$lineHeightXS:				13px;
+$lineHeightS:				15px;
+$lineHeightM:				21px;
+$lineHeightL:				24px;
+$lineHeightXL:				34px;
+$lineHeightXXL:				39px;
+$lineHeightXXXL:			55px;
+
+$letterSpacingXS:			0em;
+$letterSpacingS:			0em;
+$letterSpacingM:			0em;
+$letterSpacingL:			.1em;
+$letterSpacingXL:			.1em;
+$letterSpacingXXL:			.1em;
+$letterSpacingXXXL:			.1em;
+
+$fontWeightNormal:			400;
+$fontWeightLight:			300;
+$fontWeightHeader:			$fontWeightLight;
+
+
+// Media Queries 			
+// ---------------------	-----------------------------
+// $screenS:					768px;
+// $screenM:					1279px;
+// $screenL:					1441px;
+
+
+// Z-indexes				
+// ---------------------	-----------------------------
+// Used for a bird's eye view of components dependent on the z-axis
+// Try to avoid customizing these :)
+$zDropdown:					1000;
+$zPopover:					1010;
+$zTooltip:					1030;
+$zFixed:					1030;
+$zModal:					1040;
+
+
+
+
+

@@ -1,0 +1,130 @@
+// CSS
+// --------------------------------------------------
+body {
+	background-color: $bodyColor;
+	color: $textColor;
+	padding: 0; 
+	margin: 0;
+	width: 100%;
+}
+
+a {
+	color: $linkColor;
+	text-decoration: none;
+	&:hover {
+		color: $linkHoverColor;
+		text-decoration: $textColor;
+	}
+}
+
+.xsmall {
+	font-size: $fontSizeXS;
+	line-height: $lineHeightXS; 
+	margin: 0 0 $lineHeightXS / 2;
+	letter-spacing: $letterSpacingXS;
+	font-weight: $fontWeightNormal;
+}
+
+small, .small { 
+	font-size: $fontSizeS;
+	line-height: $lineHeightS; 
+	margin: 0 0 $lineHeightS / 2;
+	letter-spacing: $letterSpacingS;
+	font-weight: $fontWeightNormal;
+}
+
+body, p, .medium {
+	font-size: $fontSizeM;
+	line-height: $lineHeightM; 
+	letter-spacing: $letterSpacingM;
+	font-weight: $fontWeightNormal;
+}	
+
+.large {
+	font-size: $fontSizeL;
+	line-height: $lineHeightL;
+	letter-spacing: $letterSpacingL;
+	font-weight: $fontWeightLight;
+}
+
+.xlarge {
+	font-size: $fontSizeXL;
+	line-height: $lineHeightXL; 
+	letter-spacing: $letterSpacingXL;
+	font-weight: $fontWeightLight;
+}
+
+.xxlarge {
+	font-size: $fontSizeXXL;
+	line-height: $lineHeightXXL; 
+	letter-spacing: $letterSpacingXXL;
+	font-weight: $fontWeightLight;
+}
+
+.xxxlarge {
+	font-size: $fontSizeXXXL;
+	line-height: $lineHeightXXXL; 
+	font-weight: $fontWeightLight;
+}
+
+.placeholder {
+	@extend .small;
+}
+
+h1, h2, h3, h4, h5 {
+	color: $headerColor;
+	font-family: $fontFamilyHeader;
+	font-weight: $fontWeightHeader;
+	margin: 0;
+	padding: 0;
+}
+
+h1 {
+	@extend .xxxlarge;
+	text-transform: uppercase;
+}
+
+h2 {
+	@extend .xxlarge;
+	padding-top: $lineHeightXXL;
+	text-transform: uppercase;
+}
+
+h3 {
+	@extend .xlarge;
+	padding-top: $lineHeightXL;
+}
+
+h4 {
+	@extend .large;
+	padding-top: $lineHeightL;
+	text-transform: uppercase;
+}
+
+h5 {
+	@extend .large;
+	padding-top: $lineHeightL;
+}
+
+ul, ol {
+	margin: 0;
+	list-style: none;
+}
+
+ul.inline, ol.inline {
+	& > li {
+		display: inline-block;
+		padding-left: 5px;
+		padding-right: 5px;
+	}
+}
+
+
+// Extendables 					
+// ---------------------	-----------------------------
+%logo {
+	width: 					161px;
+	height: 				84px;
+	background: 			transparent top left no-repeat url('../img/logo.png');
+}
+
