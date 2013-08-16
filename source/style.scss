@@ -2,5 +2,37 @@
 @import '_base.scss';
 
 svg {
+	path {
+		stroke-width: 1px;
+		stroke-color: $white;
+	}
+	text {
+		@extend .small;
+	}
+	line {
+		.vertical-axis {
+			stroke-width: 1px;
+			stroke-color: $black;
+		}
+	}
+}
 
+.hover {
+	display: none;
+	padding: 10px;
+	background: $darkGray;
+	border: 1px solid $black;
+	color: $white;
+	z-index: $zTooltip;
+	opacity: 0.95;
+	position: absolute;
+	border-radius: 8px;
+
+	ul {
+		padding: 10px 0 0 0;
+	}
+	h5 {
+		padding-top: 0px;
+		color: $white;
+	}
 }

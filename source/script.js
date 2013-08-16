@@ -63,7 +63,7 @@ var dv = {
 
 // dv.opt stores all options that can be changed "on the fly"
 dv.opt = {
-	colors: ["#00922B","#75B3D6","#444444","#700000","#0078AE"],
+	colors: ['#00922B','#75B3D6','#444444','#700000','#0078AE','#e08214','#8073ac','#f768a1'],
 	data: {
 		years: {
 			first: 2001,
@@ -71,9 +71,10 @@ dv.opt = {
 			continuous: true,
 		},
 		countries: {
-			count: 20,
+			count: 10,
 			sortCol: 'Debt',
-			default: ['South Africa']
+			default: ['South Africa'],
+			percentMin: 0.5,
 		},
 		col: 'General government gross debt - Percent of GDP',
 		power: 2,
@@ -105,10 +106,15 @@ dv.opt = {
 		h: 1.0,
 		w: 1.0,
 		line: {
-			minHeight: 5,
+			minHeight: 3,
 			pad: 10,
-			straight: 0,
+			tangent: 0.4,
 		},
+		opacity: {
+			norm: 0.8,
+			high: 1,
+			low: 0.5
+		}
 	},
 	path: {
 		data: 'data/WEO-All.csv',
@@ -306,6 +312,7 @@ dv.create.scales = function() {
 	var height = dv.dim.chart.h,
 		pad = dv.opt.chart.line.pad,
 		minHeight = dv.opt.chart.line.minHeight,
+		percentMin = dv.opt.data.countries.percentMin,
 		width = dv.dim.chart.w,
 		label = dv.opt.margin.label,
 		max = 0,
@@ -337,7 +344,7 @@ dv.create.scales = function() {
 	}
 
 	height -= countries * pad;
-	height -= (countries / 5) * minHeight;
+	height -= (countries * percentMin) * minHeight;
 
 	dv.scale.y = d3.scale.linear()
 		.domain([min, max])
@@ -348,10 +355,94 @@ dv.create.scales = function() {
 		y = dv.scale.pow(y);
 		return dv.scale.y(y);
 	};
-
 };
 
 dv.draw.flowChart = function() {
+	var margin = dv.opt.margin.label,
+		height = dv.dim.chart.h,
+		opacity = dv.opt.chart.opacity,
+		width = dv.dim.chart.w - margin.left - margin.right,
+		subset = dv.data.subset,
+		minHeight = dv.opt.chart.line.minHeight,
+		pad = dv.opt.chart.line.pad,
+		years = dv.data.years.selected,
+		startYear = years[0],
+		endYear = years[years.length - 1];
+
+	function addLabel(side) {
+		var marginal = margin[side],
+			translate, year, anchor;
+			if(side === 'left') {
+				translate = dv.opt.margin.left + marginal - 3;
+				anchor = 'end';
+				year = startYear;
+			} else {
+				translate = width - marginal + 10;
+				anchor = 'begin';
+				year = endYear;
+			}
+
+		dv.svg.main.append('g')
+			.attr('transform', 'translate (' + translate + ',0)')
+			.style('width', marginal)
+			.style('height', height)
+			.selectAll('text')
+			.data(subset)
+			.enter().append('svg:text')
+				.attr('text-anchor', anchor)
+				.attr('dy', function(d) {
+					var offset = height;
+					var h = dv.scale.ypow(d.data[year]) / 3;
+					h = h < minHeight ? 1 : h;
+					offset -= dv.scale.y(d.offset[year]);
+					offset -= d.order[year] * pad;
+					offset -= h;
+					return offset;
+				})
+				.text(function(d) { return d.name; })
+		;
+	}
+
+	function mouseon(event, path, index) {
+		dv.svg.paths
+			.style('fill-opacity', function(d, i) { if (i === index) { return opacity.high; } else { return opacity.low; } })
+		;
+		showHover(event, path, index);
+	}
+
+	function mouseoff(path) {
+		dv.svg.paths
+			.style('fill-opacity', opacity.norm)
+		;
+		hideHover(path);
+	}
+
+	function showHover(event, d) {
+		var html = '<h5>' + d.name + '</h5><ul>';
+		var years = dv.data.years.selected;
+		var height = event.pageY;
+		for (var i = years.length - 1; i >= 0; i--) {
+			var year = years[i];
+			html += '<li><strong>' + year + ': </strong>';
+			html += Math.round(d.data[year]*100) / 100 + '</li>';
+		}
+		html += '</ul>';
+
+		if (height + 200 > dv.dim.h) { height = dv.dim.h - 200; } else { height -= 20; }
+		dv.svg.hover
+			.style('top', height + 'px')
+			.style('left', (event.pageX + 20) + 'px')
+			.html(html)
+			.style('display', 'block')
+		;
+	}
+
+	function hideHover() {
+		dv.svg.hover
+			.style('display', 'none')
+		;
+	}
+
 	dv.svg.chart = dv.svg.main.append('svg:g')
 		.style('class', 'chart')
 		.attr('height', dv.dim.chart.h)
@@ -359,12 +450,35 @@ dv.draw.flowChart = function() {
 		.attr('transform', 'translate (' + dv.opt.margin.label.left + ',0)')
 	;
 
-	dv.svg.chart.selectAll('path')
-		.data(dv.data.subset)
+	dv.svg.paths = dv.svg.chart.selectAll('path')
+		.data(subset)
 		.enter().append('svg:path')
 			.attr('d', function(d) { return dv.draw.flowLine(d); })
-			.style('opacity', 0.5)
+			.style('fill', function(d) { return dv.scale.color(d.region); })
+			.style('fill-opacity', opacity.norm)
+			.on('mouseover', function(d, i) { mouseon(event, d, i); })
+			.on('mouseout', mouseoff)
 	;
+
+	dv.svg.hover = d3.select('body').append('div')
+		.attr('class', 'hover')
+	;
+
+	addLabel('left');
+	addLabel('right');
+
+	dv.svg.chart.selectAll('line')
+		.data(dv.data.years.selected)
+		.enter().append('svg:line')
+			.style('class', 'vertical-axis')
+			.style('stroke-width', '1px')
+			.style('stroke-fill', '#000')
+			.attr('x1', function(d) { return dv.scale.x(d); })
+			.attr('x2', function(d) { return dv.scale.x(d); })
+			.attr('y1', dv.dim.chart.h)
+			.attr('y2', dv.opt.margin.top)
+	;
+
 };
 
 dv.draw.flowLine = function(country) {
@@ -375,14 +489,30 @@ dv.draw.flowLine = function(country) {
 		offset = country.offset,
 		order = country.order,
 		pad = dv.opt.chart.line.pad,
-		straight = straight > 0 ? dv.scale.x.rangeBand() * dv.opt.chart.line.straight : false,
+//		tangent = dv.scale.x.rangeBand() * dv.opt.chart.line.tangent,
 		path = "M",
 		year = years[0],
-		prevYear, x, y, i;
+		x, y, i;
+
 	function pair(x, y, type) {
 		type = type ? ' ' + type : '';
 		return type + x + ',' + y;
 	}
+
+/*
+	function curve(x, y, year) {
+		var x1, y1, x2, y2, string;
+		x1 = x + tangent;
+		y1 = y;
+		x2 = dv.scale.x(year) - tangent;
+		y2 = height - dv.scale.y(offset[year]) - (order[year] * pad);
+		string = pair(x1 , y1, 'C');
+		string += pair(x2, y2, ' ');
+		string += pair(x, y, ' ');
+		return string;
+	}
+
+*/
 
 	x = dv.scale.x(year);
 	y = height - dv.scale.y(offset[year]) - dv.scale.ypow(data[year]);
@@ -392,15 +522,14 @@ dv.draw.flowLine = function(country) {
 		year = years[i];
 		x = dv.scale.x(year);
 		y = height - dv.scale.y(offset[year]) - (order[year] * pad);
-		path += pair(x, y, 'L');
-		if (i < length -1 && straight) {
-			x += straight;
-			path += pair(x, y, 'L');
-			year = years[i+1];
-			x = dv.scale.x(year) - straight;
-			y = height - dv.scale.y(offset[year]) - (order[year] * pad);
+/*
+		if (i < length - 1) {
+			path += curve(x, y, years[i+1]);
+		} else {
 			path += pair(x, y, 'L');
 		}
+*/
+		path += pair(x, y, 'L');
 	}
 
 	y = height - dv.scale.y(offset[year]);
@@ -411,30 +540,10 @@ dv.draw.flowLine = function(country) {
 		x = dv.scale.x(year);
 		y = height - dv.scale.y(offset[year]) - (order[year] * pad) - dv.scale.ypow(data[year]);
 		path += pair(x, y, 'L');
-		if (i > 0 && straight) {
-			prevYear = years[i-1];
-			x -= straight;
-			y = height - dv.scale.y(offset[year]) - (order[year] * pad) - dv.scale.ypow(data[prevYear]);
-			path += pair(x, y, 'L');
-			year = prevYear;
-			x = dv.scale.x(year) + straight;
-			y = height - dv.scale.y(offset[year]) - (order[year] * pad) - dv.scale.ypow(data[year]);
-			path += pair(x, y, 'L');
-		}
 	}
 	path += ' Z';
 	return path;
 
-/*
-	function curve(i) {
-		var string = " C" + (points[i-1][0] + (points[i][0] - points[i-1][0]) * param.tangent) + "," + points[i-1][1];
-		string += " " + (points[i][0] - (points[i][0] - points[i-1][0]) * param.tangent) + "," + points[i][1];
-		string += " " + points[i][0] + "," + points[i][1];
-		return string;  
-	}
-
-	return path;
-*/
 };
 
 
