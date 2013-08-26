@@ -1,9 +1,10 @@
 /*
 
 Bugs
+• Sizing
 
 Small Enhancements
-
+• Resizing
 
 Medium Enhancements
 
@@ -124,9 +125,11 @@ dv.opt = {
 
 // calculates and adjusts variables and options
 dv.setup.variables = function() {
+
 	// sets up max, min, and sum for use in scales
 	var optYears = dv.opt.data.years,
 		dataYears = dv.data.years,
+		margin = dv.opt.margin,
 		i, year;
 	if (optYears.continuous) { dv.data.years.selected = dv.calc.years(optYears.first, optYears.last); }
 	dv.data.years.all = dv.calc.years(dataYears.first, dataYears.last);
@@ -137,19 +140,23 @@ dv.setup.variables = function() {
 		dv.data.min[year] = 0;
 	}
 
-	dv.dim.w -= dv.opt.margin.left + dv.opt.margin.right;
-	dv.dim.h -= dv.opt.margin.top + dv.opt.margin.bottom;
+	// adjusts visualization width to accomodate margins
+	dv.dim.h -= margin.top;
+	dv.dim.w -= margin.right;
 	dv.dim.min = dv.dim.w < dv.dim.h ? dv.dim.w : dv.dim.h;
+
 	dv.svg.main = d3.select('body').append('svg')
 		.attr('width', dv.dim.w)
 		.attr('height', dv.dim.h)
 		.append('svg:g')
-			.attr('transform', 'translate(' + dv.opt.margin.left + ',' + dv.opt.margin.top + ')')
+			.attr('height', dv.dim.h)
+			.attr('width', dv.dim.w)
+			.attr('transform', 'translate(' + margin.left + ',0)')
 	;
 
 	dv.dim.chart = {
-		h: dv.dim.h * dv.opt.chart.h - dv.opt.margin.top,
-		w: dv.dim.w * dv.opt.chart.w - dv.opt.margin.left,
+		h: dv.dim.h * dv.opt.chart.h,
+		w: dv.dim.w * dv.opt.chart.w,
 	};
 
 	dv.scale.pow = function(d) { return Math.pow(d, dv.opt.data.power); };
@@ -344,7 +351,7 @@ dv.create.scales = function() {
 	}
 
 	height -= countries * pad;
-	height -= (countries * percentMin) * minHeight;
+	height -= countries * percentMin * minHeight;
 
 	dv.scale.y = d3.scale.linear()
 		.domain([min, max])
@@ -357,39 +364,42 @@ dv.create.scales = function() {
 	};
 };
 
+
 dv.draw.flowChart = function() {
-	var margin = dv.opt.margin.label,
+	var labelMargin = dv.opt.margin.label,
 		height = dv.dim.chart.h,
+		width = dv.dim.chart.w,
+		pathWidth = dv.dim.chart.w - labelMargin.right - labelMargin.left,
 		opacity = dv.opt.chart.opacity,
-		width = dv.dim.chart.w - margin.left - margin.right,
 		subset = dv.data.subset,
 		minHeight = dv.opt.chart.line.minHeight,
 		pad = dv.opt.chart.line.pad,
 		years = dv.data.years.selected,
 		startYear = years[0],
-		endYear = years[years.length - 1];
+		endYear = years[years.length - 1],
+		main = dv.svg.main,
+		eventHeight, margin, dx, i, year, anchor, html;
 
 	function addLabel(side) {
-		var marginal = margin[side],
-			translate, year, anchor;
-			if(side === 'left') {
-				translate = dv.opt.margin.left + marginal - 3;
-				anchor = 'end';
-				year = startYear;
-			} else {
-				translate = width - marginal + 10;
-				anchor = 'begin';
-				year = endYear;
-			}
+		margin = labelMargin[side];
+		if(side === 'left') {
+			dx = margin - 3;
+			anchor = 'end';
+			year = startYear;
+		} else {
+			dx = pathWidth - labelMargin.right + 3;
+			anchor = 'begin';
+			year = endYear;
+		}
 
-		dv.svg.main.append('g')
-			.attr('transform', 'translate (' + translate + ',0)')
-			.style('width', marginal)
+		dv.svg.chart.append('g')
+			.style('width', margin)
 			.style('height', height)
 			.selectAll('text')
 			.data(subset)
 			.enter().append('svg:text')
 				.attr('text-anchor', anchor)
+				.attr('dx', dx)
 				.attr('dy', function(d) {
 					var offset = height;
 					var h = dv.scale.ypow(d.data[year]) / 3;
@@ -418,19 +428,18 @@ dv.draw.flowChart = function() {
 	}
 
 	function showHover(event, d) {
-		var html = '<h5>' + d.name + '</h5><ul>';
-		var years = dv.data.years.selected;
-		var height = event.pageY;
-		for (var i = years.length - 1; i >= 0; i--) {
-			var year = years[i];
+		html = '<h5>' + d.name + '</h5><ul>';
+		eventHeight = event.pageY;
+		for (i = years.length - 1; i >= 0; i--) {
+			year = years[i];
 			html += '<li><strong>' + year + ': </strong>';
 			html += Math.round(d.data[year]*100) / 100 + '</li>';
 		}
 		html += '</ul>';
 
-		if (height + 200 > dv.dim.h) { height = dv.dim.h - 200; } else { height -= 20; }
+		if (eventHeight + 200 > dv.dim.h) { eventHeight = dv.dim.h - 200; } else { eventHeight -= 20; }
 		dv.svg.hover
-			.style('top', height + 'px')
+			.style('top', eventHeight + 'px')
 			.style('left', (event.pageX + 20) + 'px')
 			.html(html)
 			.style('display', 'block')
@@ -443,15 +452,16 @@ dv.draw.flowChart = function() {
 		;
 	}
 
-	dv.svg.chart = dv.svg.main.append('svg:g')
+	dv.svg.chart = main.append('svg:g')
 		.style('class', 'chart')
-		.attr('height', dv.dim.chart.h)
-		.attr('width', dv.dim.chart.w)
-		.attr('transform', 'translate (' + dv.opt.margin.label.left + ',0)')
+		.attr('height', height)
+		.attr('width', width)
 	;
 
-	dv.svg.paths = dv.svg.chart.selectAll('path')
+	dv.svg.paths = dv.svg.chart.append('svg:g')
+		.selectAll('path')
 		.data(subset)
+		.attr('transform', 'translate(' + labelMargin.left + ',0)')
 		.enter().append('svg:path')
 			.attr('d', function(d) { return dv.draw.flowLine(d); })
 			.style('fill', function(d) { return dv.scale.color(d.region); })
