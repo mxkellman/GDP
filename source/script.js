@@ -72,7 +72,7 @@ dv.opt = {
 			continuous: true,
 		},
 		countries: {
-			count: 10,
+			count: 30,
 			sortCol: 'Debt',
 			default: ['South Africa'],
 			percentMin: 0.5,
@@ -387,7 +387,7 @@ dv.draw.flowChart = function() {
 			anchor = 'end';
 			year = startYear;
 		} else {
-			dx = pathWidth - labelMargin.right + 3;
+			dx = pathWidth - labelMargin.right - labelMargin.left + 5;
 			anchor = 'begin';
 			year = endYear;
 		}
