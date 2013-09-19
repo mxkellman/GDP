@@ -1,6 +1,10 @@
 @import '_variables.scss';
 @import '_base.scss';
 
+body {
+	background-color: #f1f1f7;
+}
+
 svg {
 	path {
 		stroke-width: 1px;
@@ -17,8 +21,8 @@ svg {
 	}
 }
 
-.hover {
-	display: none;
+#hover {
+	visibility: hidden;
 	padding: 10px;
 	background: $darkGray;
 	border: 1px solid $black;
@@ -27,6 +31,7 @@ svg {
 	opacity: 0.95;
 	position: absolute;
 	border-radius: 8px;
+	pointer-events: none;
 
 	ul {
 		padding: 10px 0 0 0;
