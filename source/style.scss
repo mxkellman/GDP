@@ -12,9 +12,12 @@ svg {
 		stroke-color: $white;
 	}
 	text {
-		@extend .medium;
 		font-weight: $fontWeightLight;
 		fill: $medGray;
+		&.xLabel {
+			font-size: 11px;
+			fill: $gray;
+		}
 	}
 	.vertical-axis {
 		rect {

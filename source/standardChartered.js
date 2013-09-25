@@ -25,6 +25,7 @@ var dv = {
 	data: {},
 	dim: {},
 	draw: {},
+	write: {},
 	format: {},
 	get: {},
 	html: {},
@@ -404,6 +405,21 @@ dv.create.scales = function() {
 		return dv.scale.y(y);
 	};
 
+	dv.scale.ylabel = d3.scale.linear()
+		.domain([0,1200])
+		.rangeRound([11,16])
+	;
+
+	dv.scale.xlabel = d3.scale.linear()
+		.domain([0,1200])
+		.rangeRound([10,13])
+	;
+
+	dv.scale.header = d3.scale.linear()
+		.domain([0,1200])
+		.rangeRound([18,40])
+	;
+
 	dv.scale.color = d3.scale.ordinal().range(dv.opt.colors);
 };
 
@@ -522,6 +538,7 @@ dv.draw.xLabels = function() {
 	dv.svg.label.x.text = dv.svg.label.x.g.selectAll('text')
 		.data(dv.data.years.selected)
 		.enter().append('svg:text')
+			.attr('class', 'xLabel')
 			.attr('text-anchor', 'middle')
 			.text(function(d) { return d; })
 	;
@@ -667,7 +684,8 @@ dv.update.svg = function() {
 };
 
 dv.update.yLabels = function(side) {
-	var translate = dv.opt.margin.label.left;
+	var translate = dv.opt.margin.label.left,
+		size = dv.scale.ylabel(dv.dim.chart.h);
 	if(side === 'left') {
 		translate -= dv.opt.text.pad;
 	} else {
@@ -675,15 +693,20 @@ dv.update.yLabels = function(side) {
 	}
 
 	dv.svg.label[side].g.attr('transform', 'translate(' + translate + ',0)');
-	dv.svg.label[side].text.attr('dy', function(d) { return dv.calc.labelOffset(d, side); });
+	dv.svg.label[side].text
+		.style('font-size', size)
+		.attr('dy', function(d) { return dv.calc.labelOffset(d, side); });
 };
 
 dv.update.xLabels = function() {
 	var width = dv.scale.x(dv.data.years.selected[1]) - dv.scale.x(dv.data.years.selected[0]),
-		height = dv.dim.chart.h + 10;
+		size = dv.scale.xlabel(dv.dim.chart.w),
+		height = dv.dim.chart.h + size * 0.5;
+
 	dv.svg.label.x.g.attr('transform', 'translate(' + dv.opt.margin.label.left + ',' + height + ')');
 	dv.svg.label.x.text
 		.attr('width', width)
+		.style('font-size', size)
 		.attr('dy', 0)
 		.attr('dx', function(d) { return (dv.scale.x(d-1) + width / 2); })
 		.style('visibility', function(d, i) {
