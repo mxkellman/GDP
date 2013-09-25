@@ -3,6 +3,7 @@
 
 body {
 	background-color: #f1f1f7;
+	margin: 40px;
 }
 
 svg {
@@ -11,24 +12,34 @@ svg {
 		stroke-color: $white;
 	}
 	text {
-		@extend .small;
+		@extend .medium;
+		font-weight: $fontWeightLight;
+		fill: $medGray;
 	}
-	line {
-		.vertical-axis {
-			stroke-width: 1px;
-			stroke-color: $black;
+	.vertical-axis {
+		rect {
+			shape-rendering: crispEdges;
+			opacity: 0.15;
+			fill: $blue;
+			&.odd {
+				opacity: 0;
+			}
 		}
 	}
 }
 
+h1 {
+	font-weight: 100;
+	margin-bottom: 20px;
+}
+
 #hover {
-	visibility: hidden;
 	padding: 10px;
 	background: $darkGray;
 	border: 1px solid $black;
 	color: $white;
 	z-index: $zTooltip;
-	opacity: 0.95;
+	opacity: 0.0;
 	position: absolute;
 	border-radius: 8px;
 	pointer-events: none;

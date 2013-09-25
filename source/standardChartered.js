@@ -36,100 +36,107 @@ var dv = {
 	util: {},
 };
 
+// dv.opt stores all options that can be changed 'on the fly'
+dv.opt = {
+	colors: ['#08519c','#4292c6','#6baed6','#74c476','#238b45','#00441b'],
+	data: {
+		years: {
+			first: 2001,
+			last: 2011,
+			continuous: true,
+		},
+		countries: {
+			count: 20,
+			sortCol: 'Debt',
+			default: [],
+		},
+		col: 'General government gross debt - Percent of GDP',
+		power: 2,
+		calc: function(country) {
+			var years = dv.data.years.all,
+				i, year, GDP, debtToGDP;
+			country.data.Debt = {};
+			for (i = years.length - 1; i >= 0; i--) {
+				year = years[i];
+				GDP = country.data['Gross domestic product, current prices - U.S. dollars'][year];
+				debtToGDP = country.data['General government gross debt - Percent of GDP'][year];
+				if (GDP && debtToGDP) {	country.data.Debt[year] = GDP * debtToGDP; }
+				else { country.data.Debt[year] = false; }
+			}
+			return country;
+		},
+	},
+	margin: {
+		left: 0,
+		right: 0,
+		top: 0,
+		bottom: 0,
+		label: {
+			left: 120,
+			right: 120,
+			top: 0,
+			bottom: 0,
+		},
+	},
+	chart: {
+		line: {
+			minHeight: 8,
+			pad: 16,
+		},
+		opacity: {
+			norm: 0.85,
+			high: 1,
+			low: 0.25
+		},
+		curve: {
+			straight: 0,
+			rank: 1,
+			change: 5,
+			rankCP: 0.5,
+			changeCP: 0,
+		}
+	},
+	svg: {
+		mindim: {
+			h: 350,
+			w: 500
+		}
+	},
+	path: {
+		data: 'data/WEO-All.csv',
+		region: 'data/regions.csv'
+	},
+	text: {
+		pad: 5
+	}
+};
+
+dv.data = {
+	countries: {
+		all: [],
+		selected: [],
+	},
+	full: {
+		arr: [],
+		obj: {},
+	},
+	max: {},
+	min: {},
+	sum: {},
+	years: {
+		first: 1980,
+		last: 2018,
+		all: [],
+		selected: [],
+	},
+};
+
 
 /* SETUP: gets stuff set up */
 
 // calculates and adjusts variables and options
 dv.setup.variables = function() {
 
-	// dv.opt stores all options that can be changed 'on the fly'
-	dv.opt = {
-		colors: ['#08519c','#4292c6','#6baed6','#74c476','#238b45','#00441b'],
-		data: {
-			years: {
-				first: 2001,
-				last: 2011,
-				continuous: true,
-			},
-			countries: {
-				count: 20,
-				sortCol: 'Debt',
-				default: [],
-			},
-			col: 'General government gross debt - Percent of GDP',
-			power: 2,
-			calc: function(country) {
-				var years = dv.data.years.all,
-					i, year, GDP, debtToGDP;
-				country.data.Debt = {};
-				for (i = years.length - 1; i >= 0; i--) {
-					year = years[i];
-					GDP = country.data['Gross domestic product, current prices - U.S. dollars'][year];
-					debtToGDP = country.data['General government gross debt - Percent of GDP'][year];
-					if (GDP && debtToGDP) {	country.data.Debt[year] = GDP * debtToGDP; }
-					else { country.data.Debt[year] = false; }
-				}
-				return country;
-			},
-		},
-		margin: {
-			left: 40,
-			right: 40,
-			top: 20,
-			bottom: 20,
-			label: {
-				left: 100,
-				right: 100,
-				top: 0,
-				bottom: 0,
-			},
-		},
-		chart: {
-			line: {
-				minHeight: 3,
-				pad: 10,
-			},
-			opacity: {
-				norm: 0.8,
-				high: 1,
-				low: 0.5
-			},
-			curve: {
-				straight: 0,
-				rank: 1,
-				change: 5,
-				rankCP: 0.5,
-				changeCP: 0,
-			}
-		},
-		path: {
-			data: 'data/WEO-All.csv',
-			region: 'data/regions.csv'
-		},
-		text: {
-			pad: 3
-		}
-	};
-	
-	dv.data = {
-		countries: {
-			all: [],
-			selected: [],
-		},
-		full: {
-			arr: [],
-			obj: {},
-		},
-		max: {},
-		min: {},
-		sum: {},
-		years: {
-			first: 1980,
-			last: 2018,
-			all: [],
-			selected: [],
-		},
-	};
 	dv.setup.dims();
 
 	// sets up max, min, and sum for use in scales
@@ -144,59 +151,61 @@ dv.setup.variables = function() {
 		dv.data.max[year] = 0;
 		dv.data.min[year] = 0;
 	}
-
-	dv.draw.svg();
-
-	dv.scale.pow = function(d) { return Math.pow(d, dv.opt.data.power); };
-	dv.scale.color = d3.scale.ordinal().range(dv.opt.colors);
 };
 
 // any setup that can be done before/while the data is being processed
-dv.setup.withoutData = function() {
+dv.setup.preData = function() {
 	dv.setup.variables();
 	dv.get.data();
 };
 
-// setup that has to be done after the data is loaded
-dv.setup.withData = function() {
-	dv.create.cleanData();
-	dv.create.countryList();
-	dv.create.subset();
-	dv.create.scales();
-	dv.draw.flowChart();
-};
-
 // figure out how big everything needs to be
 dv.setup.dims = function() {
-	var margin = dv.opt.margin;
+	var margin = dv.opt.margin,
+		mindim = dv.opt.svg.mindim;
+
+	dv.html.win = window || document.documentElement || document.getElementsByTagName('body')[0];
+	dv.html.body = d3.select('body');
+	dv.html.svg = dv.html.svg || dv.draw.svg();
 
 	dv.dim.win = {
-		w: window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
-		h: window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight
+		h: dv.html.win.innerHeight || dv.html.win.clientHeight,
+		w: dv.html.win.innerWidth || dv.html.win.clientWidth
+	};
+
+	dv.dim.body = {
+		top: parseInt(dv.html.body.style('margin-top'), 10),
+		right: parseInt(dv.html.body.style('margin-right'), 10),
+		bottom: parseInt(dv.html.body.style('margin-bottom'), 10),
+		left: parseInt(dv.html.body.style('margin-left'), 10)
 	};
 
 	dv.dim.svg = {
-		h: dv.dim.win.h - margin.top - margin.bottom,
-		w: dv.dim.win.w - margin.left - margin.right,
+		h: dv.dim.win.h - margin.top - margin.bottom - dv.html.svg.offsetTop - dv.dim.body.bottom,
+		w: dv.dim.win.w - margin.left - margin.right - dv.html.svg.offsetLeft - dv.dim.body.right,
 	};
+	dv.dim.svg.h = dv.dim.svg.h < mindim.h ? mindim.h : dv.dim.svg.h;
+	dv.dim.svg.w = dv.dim.svg.w < mindim.w ? mindim.w : dv.dim.svg.w;
 
 	dv.dim.chart = {
 		h: dv.dim.svg.h - margin.label.top - margin.label.bottom,
 		w: dv.dim.svg.w - margin.label.left - margin.label.right,
 	};
+
+	dv.update.svg();
 };
 
 
 /* GET: Retrive data from external files */
 
 // retrieves the data from files and does a minimal amount of processing
-// dv.state.load tracks asynchronous data calls and allows  
+// dv.state.data tracks asynchronous data calls and allows  
 dv.get.data = function() {
-	dv.update.load(2);
+	dv.update.data(2);
 	
 	d3.csv(dv.opt.path.data, function(error, data) {
 		dv.data.full.obj = data;
-		dv.update.load(-1);
+		dv.update.data(-1);
 	});
 
 	d3.csv(dv.opt.path.region, function(error, data) {
@@ -204,8 +213,24 @@ dv.get.data = function() {
 		for (var i = data.length - 1; i >= 0; i--) {
 			dv.data.region[data[i].Country] = data[i].Region;
 		}
-		dv.update.load(-1);
+		dv.update.data(-1);
 	});
+};
+
+// allows asynchronous loading of multiple data files, executes dv.setup.data() when it's done
+dv.update.data = function(change) {
+	dv.state.data = dv.state.data || 0;
+	dv.state.data += change;
+	if (dv.state.data === 0) { dv.setup.data(); }
+};
+
+// setup that has to be done after the data is loaded
+dv.setup.data = function() {
+	dv.create.cleanData();
+	dv.create.countryList();
+	dv.create.subset();
+	dv.create.scales();
+	dv.draw.flowChart();
 };
 
 
@@ -299,6 +324,8 @@ dv.create.subset = function() {
 		full = dv.data.full.obj,
 		i, name, country, fullCountry, i2, year, value, scaleValue;
 
+	dv.scale.pow = function(d) { return Math.pow(d, dv.opt.data.power); };
+
 	for (i = countries.length - 1; i >= 0; i--) {
 		name = countries[i];
 		fullCountry = full[name];
@@ -326,19 +353,20 @@ dv.create.subset = function() {
 	dv.data.subset = subset;
 };
 
+dv.create.yscale = function() {
+	dv.dim.yscale = dv.dim.chart.h - dv.data.countries.selected.length * dv.opt.chart.line.pad;
+};
+
 dv.create.scales = function() {
 
 	// go through the years actually in use and find the min
 	// calculate offset and order for each year
-	var height = dv.dim.chart.h,
-		width = dv.dim.chart.w,
+	var width = dv.dim.chart.w,
 		lineopt = dv.opt.chart.line,
-		pad = lineopt.pad,
-		minHeight = dv.opt.chart.line.minHeight,
+		minHeight = lineopt.minHeight,
 		max = 0,
 		min = 0,
 		years = dv.data.years.selected,
-		countries = dv.data.countries.selected.length,
 		subset = dv.data.subset,
 		i, year, length, i2, offset, country;
 
@@ -359,7 +387,7 @@ dv.create.scales = function() {
 		}
 	}
 
-	dv.dim.yscale = height - countries * pad;
+	dv.create.yscale();
 
 	dv.scale.x = d3.scale.linear()
 		.domain([years[0], years[years.length - 1]])
@@ -375,74 +403,32 @@ dv.create.scales = function() {
 		y = dv.scale.pow(y);
 		return dv.scale.y(y);
 	};
+
+	dv.scale.color = d3.scale.ordinal().range(dv.opt.colors);
 };
 
 
-/* DRAW: Draw SVG elements */
+/* DRAW: Draw SVG elements for the first time */
 
 dv.draw.svg = function() {
 	var	margin = dv.opt.margin;
 
-	dv.svg.svg = d3.select('body').append('svg');
+	dv.svg.svg = dv.html.body.append('svg');
 	dv.svg.main = dv.svg.svg
-		.attr('width', dv.dim.win.w)
-		.attr('height', dv.dim.win.h)
 		.append('svg:g')
 			.attr('transform', 'translate(' + margin.left + ',' + margin.top + ')')
 	;
+	return dv.svg.svg[0][0];
 };
 
 dv.draw.flowChart = function() {
 	var margin = dv.opt.margin,
 		opacity = dv.opt.chart.opacity,
-		subset = dv.data.subset,
-		minHeight = dv.opt.chart.line.minHeight,
-		pad = dv.opt.chart.line.pad,
 		years = dv.data.years.selected,
-		startYear = years[0],
-		endYear = years[years.length - 1],
-		main = dv.svg.main,
-		textPadding = dv.opt.text.pad,
-		labelWidth, eventHeight, translate, i, year, anchor, html;
-
-	function addLabel(side) {
-		labelWidth = margin.label[side] - textPadding;
-		translate = margin.label.left;
-		if(side === 'left') {
-			translate -= textPadding;
-			anchor = 'end';
-			year = startYear;
-		} else {
-			translate += dv.dim.chart.w + textPadding;
-			anchor = 'begin';
-			year = endYear;
-		}
-
-		dv.svg.label = dv.svg.label || {};
-		dv.svg.label[side] = {};
-
-		dv.svg.label[side].g = dv.svg.chart.append('g')
-			.attr('transform', 'translate(' + translate + ',0)');
-		dv.svg.label[side].text = dv.svg.label[side].g.selectAll('text')
-			.data(subset)
-			.enter().append('svg:text')
-				.attr('width', labelWidth)
-				.attr('text-anchor', anchor)
-				.attr('dy', function(d) {
-					var offset = dv.dim.chart.h;
-					var h = dv.scale.ypow(d.data[year]) / 3;
-					h = h < minHeight ? 1 : h;
-					offset -= dv.scale.y(d.offset[year]);
-					offset -= d.order[year] * pad;
-					offset -= h;
-					return offset;
-				})
-				.text(function(d) { return d.name; })
-		;
-	}
+		eventHeight, i, year, html;
 
 	function mouseon(event, d, index) {
-		dv.svg.paths
+		dv.svg.paths.transition().duration(250)
 			.style('fill-opacity', function(d, i) { if (i === index) { return opacity.high; } else { return opacity.low; } })
 		;
 
@@ -459,41 +445,85 @@ dv.draw.flowChart = function() {
 	}
 
 	function mouseoff() {
-		dv.svg.paths
+		dv.svg.paths.transition().duration(250)
 			.style('fill-opacity', opacity.norm)
 		;
 		dv.hover.hide();
 	}
 
-	dv.svg.chart = main.append('svg:g');
+	dv.svg.chart = dv.svg.main.append('svg:g');
+
+	dv.svg.axis = dv.svg.chart.append('svg:g')
+		.attr('transform', 'translate(' + margin.label.left + ',' + margin.label.top + ')')
+		.attr('class', 'vertical-axis')
+		.selectAll('rect')
+		.data(dv.data.years.selected)
+		.enter().append('svg:rect')
+			.attr('class', function(d, i) { if (i%2 === 0) { return 'even'; } else { return 'odd'; } })
+			.attr('y', dv.opt.margin.top)
+			.style('display', function(d, i) { if (i === dv.data.years.selected.length - 1) { return 'none'; } else { return false; } })
+	;
+	dv.update.axis();
 
 	dv.svg.paths = dv.svg.chart.append('svg:g')
-		.attr('transform', 'translate(' + margin.label.left + ',' + margin.label.top + ')')
+		.attr('transform', 'translate(' + dv.opt.margin.label.left + ',' + dv.opt.margin.label.top + ')')
 		.selectAll('path')
-		.data(subset)
+		.data(dv.data.subset)
 		.enter().append('svg:path')
-			.attr('d', function(d) { return dv.draw.flowLine(d); })
 			.style('fill', function(d) { return dv.scale.color(d.region); })
 			.style('fill-opacity', opacity.norm)
 			.on('mouseover', function(d, i) { mouseon(event, d, i); })
 			.on('mouseout', mouseoff)
 	;
+	dv.update.paths();
 
-	addLabel('left');
-	addLabel('right');
+	dv.draw.yLabels('left');
+	dv.draw.yLabels('right');
 
-/*	dv.svg.paths.selectAll('line')
+/*	For Axis Lines (instead of rectangles)
+	dv.svg.axis = dv.svg.chart.append('svg:g')
+		.attr('transform', 'translate(' + margin.label.left + ',' + margin.label.top + ')')
+		.selectAll('line')
 		.data(dv.data.years.selected)
 		.enter().append('svg:line')
-			.style('class', 'vertical-axis')
-			.style('stroke-width', '1px')
-			.style('stroke-fill', '#000')
-			.attr('x1', function(d) { return dv.scale.x(d); })
-			.attr('x2', function(d) { return dv.scale.x(d); })
-			.attr('y1', dv.dim.chart.h)
+			.attr('class', 'vertical-axis')
 			.attr('y2', dv.opt.margin.top)
 	;
-*/};
+*/
+};
+
+dv.draw.yLabels = function(side) {
+	var anchor, year,
+		years = dv.data.years.selected,
+		textPadding = dv.opt.text.pad,
+		labelWidth = dv.opt.margin.label[side] - textPadding,
+		translate = dv.opt.margin.label.left;
+	
+	if (side === 'left') {
+		translate -= textPadding;
+		anchor = 'end';
+		year = years[0];
+	} else {
+		translate += dv.dim.chart.w + textPadding;
+		anchor = 'begin';
+		year = years[years.length - 1];
+	}
+
+	dv.svg.label = dv.svg.label || {};
+	dv.svg.label[side] = {};
+
+	dv.svg.label[side].g = dv.svg.chart.append('g')
+		.attr('transform', 'translate(' + translate + ',0)');
+	dv.svg.label[side].text = dv.svg.label[side].g.selectAll('text')
+		.data(dv.data.subset)
+		.enter().append('svg:text')
+			.attr('width', labelWidth)
+			.attr('text-anchor', anchor)
+			.attr('dy', function(d) { return dv.calc.labelOffset(d, side); })
+			.text(function(d) { return d.name; })
+	;
+};
+
 
 dv.draw.flowLine = function(country) {
 	var years = dv.data.years.selected,
@@ -610,52 +640,61 @@ dv.draw.flowLine = function(country) {
 	return path;
 };
 
-/* UPDATE: Update data and/or SVG */
-dv.update.dims = function() {
-	dv.setup.variables();
 
-	dv.svg.svg
-		.attr('width', dv.dim.win.w)
-		.attr('height', dv.dim.win.h)
-	;
+/* UPDATE: Update data and/or SVG */
+
+dv.update.resize = function() {
+	dv.setup.dims();
+
+	dv.create.yscale();
 
 	dv.scale.x.rangeRound([0, dv.dim.chart.w]);
 	dv.scale.y.rangeRound([dv.opt.chart.line.minHeight, dv.dim.yscale]);
-	dv.svg.paths.transition().attr('d', function(d) { return dv.draw.flowLine(d); });
 
-// Label Updates aren't working yet.
-/*
-	var margin = dv.opt.margin.label.left,
-		pad = dv.opt.text.pad,
-		years = dv.data.years.selected,
-		startYear = years[0],
-		endYear = years[years.length - 1];
-	dv.svg.label.left.g.transition().attr('transform', 'translate(' + margin - pad + ',0)');
-	dv.svg.label.left.text.transition()
-		.attr('dy', function(d) {
-			var offset = dv.dim.chart.h;
-			var h = dv.scale.ypow(d.data[startYear]) / 3;
-			h = h < dv.opt.chart.line.minheight ? 1 : h;
-			offset -= dv.scale.y(d.offset[startYear]);
-			offset -= d.order[startYear] * pad;
-			offset -= h;
-			return offset;
-		})
-	;
-	dv.svg.label.right.g.transition().attr('transform', 'translate(' + dv.dim.chart.w + pad + ',0)');
-	dv.svg.label.right.text.transition()
-		.attr('dy', function(d) {
-			var offset = dv.dim.chart.h;
-			var h = dv.scale.ypow(d.data[endYear]) / 3;
-			h = h < dv.opt.chart.line.minheight ? 1 : h;
-			offset -= dv.scale.y(d.offset[endYear]);
-			offset -= d.order[endYear] * pad;
-			offset -= h;
-			return offset;
-		})
-	;
-*/
+	dv.update.svg();
+	dv.update.paths();
+	dv.update.yLabels('right');
+	dv.update.yLabels('left');
+	dv.update.axis();
 };
+
+dv.update.svg = function() {
+	dv.svg.svg.attr('width', dv.dim.win.w).attr('height', dv.dim.win.h);
+};
+
+dv.update.yLabels = function(side) {
+	var translate = dv.opt.margin.label.left;
+	if(side === 'left') {
+		translate -= dv.opt.text.pad;
+	} else {
+		translate += dv.dim.chart.w + dv.opt.text.pad;
+	}
+
+	dv.svg.label[side].g.attr('transform', 'translate(' + translate + ',0)');
+	dv.svg.label[side].text.attr('dy', function(d) { return dv.calc.labelOffset(d, side); });
+};
+
+dv.update.axis = function() {
+	var width = dv.scale.x(dv.data.years.selected[1]) - dv.scale.x(dv.data.years.selected[0]);
+
+	dv.svg.axis
+		.attr('x', function(d) { return dv.calc.axisLabelX(d); })
+		.attr('width', width)
+		.attr('height', dv.dim.chart.h - dv.opt.chart.line.minHeight)
+	;
+
+/*	For Axis Lines (instead of rectangles)
+	dv.svg.axis
+		.attr('x1', function(d) { return dv.calc.axisLabelX(d); })
+		.attr('x2', function(d) { return dv.calc.axisLabelX(d); })
+		.attr('y1', dv.dim.chart.h)
+	;
+*/};
+
+dv.update.paths = function() {
+	dv.svg.paths.attr('d', function(d) { return dv.draw.flowLine(d); });
+};
+
 
 /* CALC: Calculate something and return a value */
 
@@ -668,7 +707,25 @@ dv.calc.years = function(start, end) {
 	return years;
 };
 
-/* Utility function */
+dv.calc.labelOffset = function(d, side) {
+	var year, h,
+		offset = dv.dim.chart.h,
+		years = dv.data.years.selected;
+	if (side === 'left') { year = years[0]; } else { year = years[years.length - 1]; }
+
+	h = dv.scale.ypow(d.data[year]) / 2 - 5;
+	offset -= dv.scale.y(d.offset[year]);
+	offset -= d.order[year] * dv.opt.chart.line.pad;
+	offset -= h;
+	return offset;
+};
+
+dv.calc.axisLabelX = function(d) {
+	return dv.scale.x(d);
+};
+
+
+/* UTIL: Utility functions */
 
 // expects { array: , year: , col: (optional) }
 dv.util.sortByData = function(o) {
@@ -682,43 +739,50 @@ dv.util.sortByData = function(o) {
 	return o.array;
 };
 
-/* Reusable functions */
 
-// used to allow asynchronous loading of multiple data files, executes dv.setup.withData() when it's done
-dv.update.load = function(change) {
-	dv.state.load = dv.state.load || 0;
-	dv.state.load += change;
-	if (dv.state.load === 0) { dv.setup.withData(); }
-};
+/* Reusable functions */
 
 // creates a hover that can be called by dv.util.hover(event, html), if no event or html is provided, hover is hidden
 dv.hover = dv.hover || {};
 dv.hover.show = function(event, html) {
 	if (!dv.html.hover) { dv.hover.create(); }
 	var x, y, hover, height, width,
-		win = dv.dim.win,
-		margin = 20,
-		offset = 10;
+		dim = dv.dim.win,
+		win = dv.html.win,
+		scroll = { x: win.scrollX, y: win.scrollY },
+		opt = dv.opt.hover || {},
+		margin = opt.margin || 10,
+		offset = opt.offset || 10;
 
 	if (event && html) {
-		x = event.pageX + offset;
-		y = event.pageY - offset;
+		x = event.clientX + offset;
+		y = event.clientY - offset;
+
 		hover = document.getElementById('hover');
 		dv.html.hover.html(html);
 		height = hover.offsetHeight;
 		width = hover.offsetWidth;
-		if (x + width + margin >= win.w) { x = x - offset - width - margin; }
-		if (y + height + margin >= win.h) { y = win.h - margin - height; }
-		dv.html.hover.style('top', y + 'px').style('left', x + 'px').style('visibility','visible');
+		if (x + width + margin >= dim.w) { x = x - 2 * offset - width; x = x < scroll.x ? margin : x; }
+		if (y + height + margin >= dim.h) { y = dim.h - margin - height; y = y < scroll.y ? dim.h - height - margin : y; }
+		x += scroll.x;
+		y += scroll.y;
+		dv.html.hover.style('top', y + 'px').style('left', x + 'px');
+		dv.html.hover.transition().style('opacity', 0.95);
 	}
 };
 dv.hover.create = function() {
-	dv.html.hover = d3.select('body').append('div').attr('id', 'hover');
+	dv.html.hover = d3.select('body').append('div')
+		.attr('id', 'hover')
+		.style('display', 'block')
+		.attr('visibility', 'hidden');
 };
 dv.hover.hide = function() {
-	if (dv.html.hover) { dv.html.hover.style('visibility','hidden'); }
+	if (dv.html.hover) { dv.html.hover.transition().style('opacity', 0.0); }
 };
 
+/* Kick everything off */
+dv.setup.preData();
 
-
-dv.setup.withoutData();
+window.onresize = function() {
+	dv.update.resize();
+};
