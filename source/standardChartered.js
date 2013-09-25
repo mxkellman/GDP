@@ -41,7 +41,7 @@ dv.opt = {
 	colors: ['#08519c','#4292c6','#6baed6','#74c476','#238b45','#00441b'],
 	data: {
 		years: {
-			first: 2001,
+			first: 2000,
 			last: 2011,
 			continuous: true,
 		},
@@ -75,7 +75,7 @@ dv.opt = {
 			left: 120,
 			right: 120,
 			top: 0,
-			bottom: 0,
+			bottom: 20,
 		},
 	},
 	chart: {
@@ -425,7 +425,7 @@ dv.draw.flowChart = function() {
 	var margin = dv.opt.margin,
 		opacity = dv.opt.chart.opacity,
 		years = dv.data.years.selected,
-		eventHeight, i, year, html;
+		length, eventHeight, i, year, html;
 
 	function mouseon(event, d, index) {
 		dv.svg.paths.transition().duration(250)
@@ -434,7 +434,8 @@ dv.draw.flowChart = function() {
 
 		html = '<h5>' + d.name + '</h5><ul>';
 		eventHeight = event.pageY;
-		for (i = years.length - 1; i >= 0; i--) {
+		length = years.length;
+		for (i = 0; i < length; i++) {
 			year = years[i];
 			html += '<li><strong>' + year + ': </strong>';
 			html += Math.round(d.data[year]*100) / 100 + '</li>';
@@ -479,17 +480,7 @@ dv.draw.flowChart = function() {
 
 	dv.draw.yLabels('left');
 	dv.draw.yLabels('right');
-
-/*	For Axis Lines (instead of rectangles)
-	dv.svg.axis = dv.svg.chart.append('svg:g')
-		.attr('transform', 'translate(' + margin.label.left + ',' + margin.label.top + ')')
-		.selectAll('line')
-		.data(dv.data.years.selected)
-		.enter().append('svg:line')
-			.attr('class', 'vertical-axis')
-			.attr('y2', dv.opt.margin.top)
-	;
-*/
+	dv.draw.xLabels();
 };
 
 dv.draw.yLabels = function(side) {
@@ -524,6 +515,18 @@ dv.draw.yLabels = function(side) {
 	;
 };
 
+dv.draw.xLabels = function() {
+	dv.svg.label = dv.svg.label || {};
+	dv.svg.label.x = {};
+	dv.svg.label.x.g = dv.svg.chart.append('g');
+	dv.svg.label.x.text = dv.svg.label.x.g.selectAll('text')
+		.data(dv.data.years.selected)
+		.enter().append('svg:text')
+			.attr('text-anchor', 'middle')
+			.text(function(d) { return d; })
+	;
+	dv.update.xLabels();
+};
 
 dv.draw.flowLine = function(country) {
 	var years = dv.data.years.selected,
@@ -655,6 +658,7 @@ dv.update.resize = function() {
 	dv.update.paths();
 	dv.update.yLabels('right');
 	dv.update.yLabels('left');
+	dv.update.xLabels();
 	dv.update.axis();
 };
 
@@ -674,6 +678,24 @@ dv.update.yLabels = function(side) {
 	dv.svg.label[side].text.attr('dy', function(d) { return dv.calc.labelOffset(d, side); });
 };
 
+dv.update.xLabels = function() {
+	var width = dv.scale.x(dv.data.years.selected[1]) - dv.scale.x(dv.data.years.selected[0]),
+		height = dv.dim.chart.h + 10;
+	dv.svg.label.x.g.attr('transform', 'translate(' + dv.opt.margin.label.left + ',' + height + ')');
+	dv.svg.label.x.text
+		.attr('width', width)
+		.attr('dy', 0)
+		.attr('dx', function(d) { return (dv.scale.x(d-1) + width / 2); })
+		.style('visibility', function(d, i) {
+			if (i === 0) {
+				return 'hidden';
+			} else if ( width < 40 && i%2 === 0) {
+				return 'hidden';
+			} else { return 'visible'; }
+		})
+	;
+};
+
 dv.update.axis = function() {
 	var width = dv.scale.x(dv.data.years.selected[1]) - dv.scale.x(dv.data.years.selected[0]);
 
@@ -682,14 +704,7 @@ dv.update.axis = function() {
 		.attr('width', width)
 		.attr('height', dv.dim.chart.h - dv.opt.chart.line.minHeight)
 	;
-
-/*	For Axis Lines (instead of rectangles)
-	dv.svg.axis
-		.attr('x1', function(d) { return dv.calc.axisLabelX(d); })
-		.attr('x2', function(d) { return dv.calc.axisLabelX(d); })
-		.attr('y1', dv.dim.chart.h)
-	;
-*/};
+};
 
 dv.update.paths = function() {
 	dv.svg.paths.attr('d', function(d) { return dv.draw.flowLine(d); });
@@ -777,7 +792,7 @@ dv.hover.create = function() {
 		.attr('visibility', 'hidden');
 };
 dv.hover.hide = function() {
-	if (dv.html.hover) { dv.html.hover.transition().style('opacity', 0.0); }
+	if (dv.html.hover) { dv.html.hover.transition().style('opacity', 0); }
 };
 
 /* Kick everything off */
