@@ -1,10 +1,9 @@
 /*
 
 Bugs
-• Sizing
+• Font-Sizing
 
 Small Enhancements
-• Resizing
 
 Medium Enhancements
 
@@ -19,27 +18,31 @@ Large Enhancements
 
 // dv is the namespace used to avoid collisions with other code or libraries
 var dv = {
-	calc: {},
-	clear: {},
-	create: {},
+
+	load: {},
+	process: {},
 	data: {},
+
 	dim: {},
-	draw: {},
-	write: {},
-	format: {},
-	get: {},
 	html: {},
-	setup: {},
 	scale: {},
-	state: {},
 	svg: {},
+	state: {},
+
+	write: {},
+	create: {},
+	draw: {},
 	update: {},
+
+	calc: {},
+	format: {},
+
 	util: {},
 };
 
 // dv.opt stores all options that can be changed 'on the fly'
 dv.opt = {
-	colors: ['#08519c','#4292c6','#6baed6','#74c476','#238b45','#00441b'],
+	colors: ['#08519c','#4292c6','#6baed6','#789','#74c476','#238b45','#00441b'],
 	data: {
 		years: {
 			first: 2000,
@@ -51,21 +54,8 @@ dv.opt = {
 			sortCol: 'Debt',
 			default: [],
 		},
-		col: 'General government gross debt - Percent of GDP',
-		power: 2,
-		calc: function(country) {
-			var years = dv.data.years.all,
-				i, year, GDP, debtToGDP;
-			country.data.Debt = {};
-			for (i = years.length - 1; i >= 0; i--) {
-				year = years[i];
-				GDP = country.data['Gross domestic product, current prices - U.S. dollars'][year];
-				debtToGDP = country.data['General government gross debt - Percent of GDP'][year];
-				if (GDP && debtToGDP) {	country.data.Debt[year] = GDP * debtToGDP; }
-				else { country.data.Debt[year] = false; }
-			}
-			return country;
-		},
+		col: 'Debt',
+		power: 1,
 	},
 	margin: {
 		left: 0,
@@ -112,56 +102,92 @@ dv.opt = {
 	}
 };
 
-dv.data = {
-	countries: {
-		all: [],
-		selected: [],
-	},
-	full: {
-		arr: [],
-		obj: {},
-	},
-	max: {},
-	min: {},
-	sum: {},
-	years: {
-		first: 1980,
-		last: 2018,
-		all: [],
-		selected: [],
-	},
+window.onresize = function() {
+	dv.update.resize();
+};
+
+/* LOAD/PROCESS: Load data from external files, Process data */
+
+// retrieves the data from files and does a minimal amount of processing
+// dv.state.data tracks asynchronous data calls and allows  
+dv.load.data = function() {
+	dv.update.state(2);
+	
+	d3.csv(dv.opt.path.data, function(error, data) {
+		dv.data.o.full = data;
+		dv.update.state(-1);
+	});
+
+	d3.csv(dv.opt.path.region, function(error, data) {
+		dv.data.o.region = {};
+		for (var i = data.length - 1; i >= 0; i--) {
+			dv.data.o.region[data[i].Country] = data[i].Region;
+		}
+		dv.update.state(-1);
+	});
+};
+
+// setup that has to be done after the data is loaded
+dv.process.data = function() {
+	dv.create.cleanData();
+	dv.create.countryList();
+	dv.create.subset();
+	dv.create.scales();
+	dv.draw.flowChart();
 };
 
 
-/* SETUP: gets stuff set up */
+/* CREATE: Create/manipulate data stuctures */
+
+dv.create.start = function() {
+	dv.create.variables();
+	dv.load.data();
+};
 
 // calculates and adjusts variables and options
-dv.setup.variables = function() {
+dv.create.variables = function() {
+	dv.data = {
+		countries: {
+			all: [],
+			selected: [],
+		},
+		full: [],
+		max: {},
+		min: {},
+		sum: {},
+		o: {
+			full: {},
+			max: {},
+			min: {},
+			sum: {},
+		},
+		resize: [],
+		years: {
+			first: 1980,
+			last: 2018,
+			all: [],
+			selected: [],
+		},
+	};
 
-	dv.setup.dims();
+	dv.create.dims();
 
 	// sets up max, min, and sum for use in scales
-	var optYears = dv.opt.data.years,
-		dataYears = dv.data.years,
+	var opt = dv.opt.data.years,
+		years = dv.data.years,
 		i, year;
-	if (optYears.continuous) { dv.data.years.selected = dv.calc.years(optYears.first, optYears.last); }
-	dv.data.years.all = dv.calc.years(dataYears.first, dataYears.last);
-	for (i = dataYears.selected.length - 1; i >= 0; i--) {
-		year = dataYears.selected[i];
-		dv.data.sum[year] = 0;
-		dv.data.max[year] = 0;
-		dv.data.min[year] = 0;
+	if (opt.continuous) { years.selected = dv.calc.years(opt.first, opt.last); }
+	years.all = dv.calc.years(years.first, years.last);
+	for (i = years.selected.length - 1; i >= 0; i--) {
+		year = years.selected[i];
+		dv.data.o.sum[year] = 0;
+		dv.data.o.max[year] = 0;
+		dv.data.o.min[year] = 0;
 	}
 };
 
-// any setup that can be done before/while the data is being processed
-dv.setup.preData = function() {
-	dv.setup.variables();
-	dv.get.data();
-};
-
 // figure out how big everything needs to be
-dv.setup.dims = function() {
+dv.create.dims = function() {
 	var margin = dv.opt.margin,
 		mindim = dv.opt.svg.mindim;
 
@@ -199,47 +225,6 @@ dv.setup.dims = function() {
 	dv.update.svg();
 };
 
-
-/* GET: Retrive data from external files */
-
-// retrieves the data from files and does a minimal amount of processing
-// dv.state.data tracks asynchronous data calls and allows  
-dv.get.data = function() {
-	dv.update.data(2);
-	
-	d3.csv(dv.opt.path.data, function(error, data) {
-		dv.data.full.obj = data;
-		dv.update.data(-1);
-	});
-
-	d3.csv(dv.opt.path.region, function(error, data) {
-		dv.data.region = {};
-		for (var i = data.length - 1; i >= 0; i--) {
-			dv.data.region[data[i].Country] = data[i].Region;
-		}
-		dv.update.data(-1);
-	});
-};
-
-// allows asynchronous loading of multiple data files, executes dv.setup.data() when it's done
-dv.update.data = function(change) {
-	dv.state.data = dv.state.data || 0;
-	dv.state.data += change;
-	if (dv.state.data === 0) { dv.setup.data(); }
-};
-
-// setup that has to be done after the data is loaded
-dv.setup.data = function() {
-	dv.create.cleanData();
-	dv.create.countryList();
-	dv.create.subset();
-	dv.create.scales();
-	dv.draw.flowChart();
-};
-
-
-/* CREATE: Create/manipulate data stuctures */
-
 // groups the data by country, data, year
 dv.create.cleanData = function() {
   var clean = {},
@@ -247,15 +232,15 @@ dv.create.cleanData = function() {
 	i, i2, row, countries, country, subject, year, value;
 
   // make country its own object, append summary info, append data
-	for (i = dv.data.full.obj.length - 1; i >= 0; i--) {
-		row = dv.data.full.obj[i];
+	for (i = dv.data.o.full.length - 1; i >= 0; i--) {
+		row = dv.data.o.full[i];
 		country = row.Country;
 		subject = row['Subject Descriptor'] + ' - ' + row.Units;
 		if (!clean[country]) {
 			clean[country] = {};
 			clean[country].data = {};
 			clean[country].code = row.ISO;
-			clean[country].region = dv.data.region[country];
+			clean[country].region = dv.data.o.region[country];
 		}
 		clean[country].data[subject] = {};
 		
@@ -270,18 +255,17 @@ dv.create.cleanData = function() {
 		}
 	}
 
-	// move temporary object into permanent clean array
-	// calculate additional values as dictated by dv.opt.data.calc()
+	// move temporary object into permanent clean array, calculate additional values
 	countries = d3.keys(clean);
 	dv.data.countries.all = countries;
-	dv.data.full.obj = {};
-	dv.data.full.arr = [];
+	dv.data.o.full = {};
+	dv.data.full = [];
 	for (i = countries.length - 1; i >= 0; i--) {
 		country = countries[i];
 		clean[country].name = country;
-		clean[country] = dv.opt.data.calc(clean[country]);
-		dv.data.full.obj[country] = clean[country];
-		dv.data.full.arr.push(clean[country]);
+		clean[country] = dv.calc.debt(clean[country]);
+		dv.data.o.full[country] = clean[country];
+		dv.data.full.push(clean[country]);
 	}
 };
 
@@ -297,9 +281,9 @@ dv.create.countryList = function() {
 
 	function getCountries(year) {
 		countryList = [];
-		dv.data.full.arr = dv.util.sortByData({array: dv.data.full.arr, col: col, year: year});
+		dv.data.full = dv.util.sortByData({array: dv.data.full, col: col, year: year});
 		for (i = length; i > length - quantity; i--) {
-			countryList.push(dv.data.full.arr[i].name);
+			countryList.push(dv.data.full[i].name);
 		}
 		return countryList;
 	}
@@ -325,7 +309,7 @@ dv.create.subset = function() {
 		years = dv.data.years.selected,
 		countries = dv.data.countries.selected,
 		col = dv.opt.data.col,
-		full = dv.data.full.obj,
+		full = dv.data.o.full,
 		i, name, country, fullCountry, i2, year, value, scaleValue;
 
 	dv.scale.pow = function(d) { return Math.pow(d, dv.opt.data.power); };
@@ -348,9 +332,9 @@ dv.create.subset = function() {
 
 			// calculates max, min, and sums per year for use in scales
 			scaleValue = dv.scale.pow(value);
-			dv.data.sum[year] += scaleValue;
-			dv.data.max[year] = d3.max([scaleValue, dv.data.max[year]]);
-			dv.data.min[year] = d3.min([scaleValue, dv.data.min[year]]);
+			dv.data.o.sum[year] += scaleValue;
+			dv.data.o.max[year] = d3.max([scaleValue, dv.data.o.max[year]]);
+			dv.data.o.min[year] = d3.min([scaleValue, dv.data.o.min[year]]);
 		}
 		subset.push(country);
 	}
@@ -376,8 +360,8 @@ dv.create.scales = function() {
 
 	for (i = years.length - 1; i >= 0; i--) {
 		year = years[i];
-		max = d3.max([dv.data.sum[year], max]);
-		min = d3.min([dv.data.min[year], min]);
+		max = d3.max([dv.data.o.sum[year], max]);
+		min = d3.min([dv.data.o.min[year], min]);
 
 		offset = 0;
 		subset = dv.util.sortByData({ array: subset, year: year });
@@ -426,9 +410,11 @@ dv.create.scales = function() {
 	dv.scale.color = d3.scale.ordinal().range(dv.opt.colors);
 };
 
+
 /* WRITE: Write out html elements */
 dv.write.header = function() {
-	dv.html.header = dv.html.body.append('h1').html('Debt to GDP Ratio');
+	dv.html.header = dv.html.body.append('h1')
+		.html('Debt to GDP Ratio');
 };
 
 dv.write.text = function() {
@@ -436,6 +422,7 @@ dv.write.text = function() {
 		.attr('class', 'explanation')
 		.html('This treemap shows the size of total government debt outstanding across 166 countries worldwide. Each small rectangle shows the size of each bond market, and the larger rectangle shows the size of the regional bond market; the larger the country/region, the further it is towards the bottom left. The colour of each square shows the debt/GDP ratio for that country. We show data here for 2001 and 2011, based on the IMF World Economic Outlook (April 2012) database, using total government debt figures across all currencies. The size of the global bond market is proportional between 2001 and 2011, using 2011 USD. In 2001, the world government bond market was USD 40.11trn in size; as of end-2011, it had reached USD 69.62trn. Despite the growth in Asia ex-Japan (a market that was 60% the size of the euro area in 2001 but is now 7% larger), its debt/GDP ratios remain much lower, reflecting the region’s economic growth.');
 };
+
 
 /* DRAW: Draw SVG elements for the first time */
 
@@ -454,7 +441,7 @@ dv.draw.flowChart = function() {
 	var margin = dv.opt.margin,
 		opacity = dv.opt.chart.opacity,
 		years = dv.data.years.selected,
-		length, eventHeight, i, year, html;
+		length, i, year, html;
 
 	function mouseon(event, d, index) {
 		dv.svg.paths.transition().duration(250)
@@ -462,7 +449,6 @@ dv.draw.flowChart = function() {
 		;
 
 		html = '<h5>' + d.name + '</h5><ul>';
-		eventHeight = event.pageY;
 		length = years.length;
 		for (i = 0; i < length; i++) {
 			year = years[i];
@@ -677,7 +663,7 @@ dv.draw.flowLine = function(country) {
 /* UPDATE: Update data, SVG, or HTML */
 
 dv.update.resize = function() {
-	dv.setup.dims();
+	dv.create.dims();
 
 	dv.create.yscale();
 
@@ -774,6 +760,19 @@ dv.calc.labelOffset = function(d, side) {
 dv.calc.axisLabelX = function(d) {
 	return dv.scale.x(d);
 };
+dv.calc.debt = function(country) {
+	var years = dv.data.years.all,
+		i, year, GDP, debtToGDP;
+	country.data.Debt = {};
+	for (i = years.length - 1; i >= 0; i--) {
+		year = years[i];
+		GDP = country.data['Gross domestic product, current prices - U.S. dollars'][year];
+		debtToGDP = country.data['General government gross debt - Percent of GDP'][year];
+		if (GDP && debtToGDP) {	country.data.Debt[year] = GDP * debtToGDP; }
+		else { country.data.Debt[year] = false; }
+	}
+	return country;
+};
 
 
 /* UTIL: Utility functions */
@@ -792,6 +791,15 @@ dv.util.sortByData = function(o) {
 
 
 /* Reusable functions */
+
+// handles multiple streams of asynchronous requests for data, kicks off a corresponding dv.process[streamName]() when the data is all loaded
+dv.update.state = function(change, name) {
+	name = name || 'data';
+	change = change || 1;
+	dv.state[name] = dv.state[name] || 0;
+	dv.state[name] += change;
+	if (dv.state[name] === 0) { dv.process[name](); }
+};
 
 // creates a hover that can be called by dv.util.hover(event, html), if no event or html is provided, hover is hidden
 dv.hover = dv.hover || {};
@@ -832,8 +840,53 @@ dv.hover.hide = function() {
 };
 
 /* Kick everything off */
-dv.setup.preData();
+dv.create.start();
 
-window.onresize = function() {
-	dv.update.resize();
-};
+/* Data Structure
+	Gross domestic product, constant prices - National currency
+	Gross domestic product, constant prices - Percent change
+	Gross domestic product, current prices - National currency
+	Gross domestic product, current prices - U.S. dollars
+	Gross domestic product, deflator - Index
+	Gross domestic product per capita, constant prices - National currency
+	Gross domestic product per capita, current prices - National currency
+	Gross domestic product per capita, current prices - U.S. dollars
+	Output gap in percent of potential GDP - Percent of potential GDP
+	Gross domestic product based on purchasing-power-parity (PPP) valuation of country GDP - Current international dollar
+	Gross domestic product based on purchasing-power-parity (PPP) per capita GDP - Current international dollar
+	Gross domestic product based on purchasing-power-parity (PPP) share of world total - Percent
+	Implied PPP conversion rate - National currency per current international dollar
+	Total investment - Percent of GDP
+	Gross national savings - Percent of GDP
+	Inflation, average consumer prices - Index
+	Inflation, average consumer prices - Percent change
+	Inflation, end of period consumer prices - Index
+	Inflation, end of period consumer prices - Percent change
+	Six-month London interbank offered rate (LIBOR) - Percent
+	Volume of imports of goods and services - Percent change
+	Volume of Imports of goods - Percent change
+	Volume of exports of goods and services - Percent change
+	Volume of exports of goods - Percent change
+	Value of oil imports - U.S. dollars
+	Value of oil exports - U.S. dollars
+	Unemployment rate - Percent of total labor force
+	Employment - Persons
+	Population - Persons
+	General government revenue - National currency
+	General government revenue - Percent of GDP
+	General government total expenditure - National currency
+	General government total expenditure - Percent of GDP
+	General government net lending/borrowing - National currency
+	General government net lending/borrowing - Percent of GDP
+	General government structural balance - National currency
+	General government structural balance - Percent of potential GDP
+	General government primary net lending/borrowing - National currency
+	General government primary net lending/borrowing - Percent of GDP
+	General government net debt - National currency
+	General government net debt - Percent of GDP
+	General government gross debt - National currency
+	General government gross debt - Percent of GDP
+	Gross domestic product corresponding to fiscal year, current prices - National currency
+	Current account balance - U.S. dollars
+	Current account balance - Percent of GDP
+*/
