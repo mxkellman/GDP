@@ -166,13 +166,15 @@ dv.setup.dims = function() {
 		mindim = dv.opt.svg.mindim;
 
 	dv.html.win = window || document.documentElement || document.getElementsByTagName('body')[0];
-	dv.html.body = d3.select('body');
-	dv.html.svg = dv.html.svg || dv.draw.svg();
-
 	dv.dim.win = {
 		h: dv.html.win.innerHeight || dv.html.win.clientHeight,
 		w: dv.html.win.innerWidth || dv.html.win.clientWidth
 	};
+
+	dv.html.body = d3.select('body');
+
+	dv.write.header();
+	dv.write.text();
 
 	dv.dim.body = {
 		top: parseInt(dv.html.body.style('margin-top'), 10),
@@ -181,6 +183,7 @@ dv.setup.dims = function() {
 		left: parseInt(dv.html.body.style('margin-left'), 10)
 	};
 
+	dv.html.svg = dv.html.svg || dv.draw.svg();
 	dv.dim.svg = {
 		h: dv.dim.win.h - margin.top - margin.bottom - dv.html.svg.offsetTop - dv.dim.body.bottom,
 		w: dv.dim.win.w - margin.left - margin.right - dv.html.svg.offsetLeft - dv.dim.body.right,
@@ -423,6 +426,16 @@ dv.create.scales = function() {
 	dv.scale.color = d3.scale.ordinal().range(dv.opt.colors);
 };
 
+/* WRITE: Write out html elements */
+dv.write.header = function() {
+	dv.html.header = dv.html.body.append('h1').html('Debt to GDP Ratio');
+};
+
+dv.write.text = function() {
+	dv.html.text = dv.html.body.append('div')
+		.attr('class', 'explanation')
+		.html('This treemap shows the size of total government debt outstanding across 166 countries worldwide. Each small rectangle shows the size of each bond market, and the larger rectangle shows the size of the regional bond market; the larger the country/region, the further it is towards the bottom left. The colour of each square shows the debt/GDP ratio for that country. We show data here for 2001 and 2011, based on the IMF World Economic Outlook (April 2012) database, using total government debt figures across all currencies. The size of the global bond market is proportional between 2001 and 2011, using 2011 USD. In 2001, the world government bond market was USD 40.11trn in size; as of end-2011, it had reached USD 69.62trn. Despite the growth in Asia ex-Japan (a market that was 60% the size of the euro area in 2001 but is now 7% larger), its debt/GDP ratios remain much lower, reflecting the region’s economic growth.');
+};
 
 /* DRAW: Draw SVG elements for the first time */
 
@@ -661,7 +674,7 @@ dv.draw.flowLine = function(country) {
 };
 
 
-/* UPDATE: Update data and/or SVG */
+/* UPDATE: Update data, SVG, or HTML */
 
 dv.update.resize = function() {
 	dv.setup.dims();
