@@ -59,6 +59,12 @@ $fontWeightNormal:			400;
 $fontWeightLight:			300;
 $fontWeightHeader:			$fontWeightLight;
 
+$textShadowOpacity:			.5;
+$textShadowColor:			#FFF;
+$textShadowRGBA:			rgba($textShadowColor, $textShadowOpacity);
+$textShadowBlur:			1;
+$textShadow:				 -#{$textShadowBlur}px -#{$textShadowBlur}px #{$textShadowBlur}px #{$textShadowRGBA}, #{$textShadowBlur}px #{$textShadowBlur}px #{$textShadowBlur}px #{$textShadowRGBA}, -#{$textShadowBlur}px #{$textShadowBlur}px #{$textShadowBlur}px #{$textShadowRGBA}, #{$textShadowBlur}px -#{$textShadowBlur}px #{$textShadowBlur}px #{$textShadowRGBA};
+
 
 // Media Queries 			
 // ---------------------	-----------------------------

@@ -29,6 +29,12 @@ svg {
 			}
 		}
 	}
+	text.line-label {
+		font-weight: bold;
+		fill: $medGray;
+		text-shadow: $textShadow;
+		pointer-events: none;
+	}
 }
 
 h1 {
