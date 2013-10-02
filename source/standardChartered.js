@@ -65,13 +65,13 @@ dv.opt = {
 	},
 	data: {
 		select: 'Gross domestic product, current prices - U.S. dollars',
-		height: 'Debt',
+		height: 'General government net debt - Percent of GDP',
 		rank: 'General government net debt - Percent of GDP',
-		power: 1,
+		power: 2,
 	},
 	format: {
-		height: 'debt',
-		rank: 'GDP',
+		height: 'GDP',
+		rank: 'debt',
 	},
 	path: {
 		data: 'data/WEO-All.csv',
@@ -140,46 +140,13 @@ dv.load.data = function() {
 dv.postload.data = function() {
 	dv.create.cleanData();
 	dv.create.countryList();
+	dv.create.prescales();
 	dv.create.subset();
 	dv.create.scales();
 	dv.draw.flowChart();
 	dv.draw.lineLabels();
 };
 
-// WIP
-dv.update.data = function() {
-	dv.create.countryList();
-	dv.create.subset();
-	dv.create.scales();
-	dv.update.resize();
-/*
-	THIS IS UPDATE.RESIZE
-
-	dv.create.dims();
-
-	dv.create.yscale();
-
-	dv.scale.x.rangeRound([0, dv.dim.chart.w]);
-	dv.scale.y.rangeRound([dv.opt.line.minHeight, dv.dim.yscale]);
-
-	dv.redraw.svg();
-	dv.redraw.paths();
-	dv.redraw.yLabels('right');
-	dv.redraw.yLabels('left');
-	dv.redraw.xLabels();
-	dv.redraw.axis();
-*/
-};
-
-//WIP
-dv.update.toPerGDP = function() {
-	dv.opt.data.height = 'General government net debt - Percent of GDP';
-	dv.opt.data.rank = 'Debt';
-	dv.opt.format.height = 'GDP';
-	dv.opt.format.rank = 'debt';
-
-	dv.update.data();
-};
 
 /* CREATE: Create/manipulate data stuctures */
 
@@ -211,7 +178,10 @@ dv.create.variables = function() {
 	};
 
 	dv.create.dims();
+	dv.create.years();
+};
 
+dv.create.years = function() {
 	// sets up max, min, and sum for use in scales
 	var opt = dv.opt.years,
 		years = dv.data.years,
@@ -350,12 +320,11 @@ dv.create.countryList = function() {
 
 dv.create.subset = function() {
 	var subset = [],
-		years = dv.data.years.selected,
 		countries = dv.data.countries.selected,
 		full = dv.dato.full,
-		i, name, country, fullCountry, i2, year, value, scaleValue;
+		first = false,
+		i, name, country, fullCountry;
 
-	dv.scale.pow = function(d) { return Math.pow(d, dv.opt.data.power); };
 	for (i = countries.length - 1; i >= 0; i--) {
 		name = countries[i];
 		fullCountry = full[name];
@@ -368,25 +337,36 @@ dv.create.subset = function() {
 		country.offset = {};
 		country.order = {};
 
-		for (i2 = years.length - 1; i2 >= 0; i2--) {
-			year = years[i2];
-			value = fullCountry.data[dv.opt.data.height][year];
-			country.height[year] = value;
-			country.rank[year] = fullCountry.data[dv.opt.data.rank][year];
 
-			// calculates max, min, and sums per year for use in scales
-			scaleValue = dv.scale.pow(value);
-			dv.dato.sum[year] += scaleValue;
-			dv.dato.max[year] = d3.max([scaleValue, dv.dato.max[year]]);
-			dv.dato.min[year] = d3.min([scaleValue, dv.dato.min[year]]);
-		}
+		if (i === countries.length - 1) { first = true; } else { first = false; }
+		country = dv.calc.country(country, first);
 		subset.push(country);
 	}
 	dv.data.subset = subset;
+	dv.data.sorted = subset;
+};
+
+dv.update.subset = function() {
+	var countries = dv.data.subset,
+		first = false,
+		i, country;
+
+	dv.data.sorted = [];
+
+	for (i = countries.length - 1; i >= 0; i--) {
+		country = countries[i];
+		if (i === countries.length - 1) { first = true; } else { first = false; }
+		country = dv.calc.country(country, first);
+		dv.data.sorted.push(country);
+	}
 };
 
 dv.create.yscale = function() {
 	dv.dim.yscale = dv.dim.chart.h - dv.data.countries.selected.length * dv.opt.line.pad;
+};
+
+dv.create.prescales = function() {
+	dv.scale.pow = function(d) { return Math.pow(d, dv.opt.data.power); };
 };
 
 dv.create.scales = function() {
@@ -400,7 +380,8 @@ dv.create.scales = function() {
 		min = 0,
 		years = dv.data.years.selected,
 		subset = dv.data.subset,
-		i, year, length, i2, offset, country;
+		sorted = dv.data.sorted,
+		i, year, length, i2, offset, country, j;
 
 	for (i = years.length - 1; i >= 0; i--) {
 		year = years[i];
@@ -408,14 +389,18 @@ dv.create.scales = function() {
 		min = d3.min([dv.dato.min[year], min]);
 
 		offset = 0;
-		subset = dv.util.aooSort({ array: subset, key: ['rank', year] });
+		dv.util.aooSort({ array: sorted, key: ['rank', year] });
 		length = subset.length;
 		for (i2 = 0; i2 < length; i2++) {
-			country = subset[i2];
+			country = sorted[i2];
 			country.offset[year] = offset;
 			country.order[year] = i2;
 			offset += dv.scale.pow(country.height[year]);
-			dv.data.subset[i2] = country;
+			j = 0;
+			while (j < subset.length && subset[j].code !== country.code) {
+				j++;
+			}
+			dv.data.subset[j] = country;
 		}
 	}
 
@@ -477,7 +462,7 @@ dv.write.header = function() {
 dv.write.text = function() {
 	dv.html.text = dv.html.body.append('div')
 		.attr('class', 'explanation')
-		.html("The height of each bar represents the country's total debt, while the position relative to other bars shows the country's debt to GDP rank.");
+		.html("Bar Height: <a href='javascript:dv.update.heightByDebt(1000)'>Debt</a> | <a href='javascript:dv.update.heightByRatio(1000)'>Debt/GDP Ratio</a> :: Bar Order: <a href='javascript:dv.update.rankByDebt(1000)'>Debt</a> | <a href='javascript:dv.update.rankByRatio(1000)'>Debt/GDP Ratio</a>");
 };
 
 
@@ -729,7 +714,49 @@ dv.redraw.lineLabels = function(country) {
 
 /* UPDATE: Update data, or many different types of things */
 
-dv.update.resize = function() {
+dv.update.rankByDebt = function(duration) {
+	dv.opt.data.rank = 'Debt';
+	dv.opt.format.rank = 'debt';
+	if (duration) { dv.update.data(duration); }
+};
+
+dv.update.heightByDebt = function(duration) {
+	dv.opt.data.height = 'Debt';
+	dv.opt.format.height = 'debt';
+	dv.opt.data.power = 1;
+	if (duration) { dv.update.data(duration); }
+};
+
+dv.update.rankByRatio = function(duration) {
+	dv.opt.data.rank = 'General government net debt - Percent of GDP';
+	dv.opt.format.rank = 'GDP';
+	if (duration) { dv.update.data(duration); }
+};
+
+dv.update.heightByRatio = function(duration) {
+	dv.opt.data.height = 'General government net debt - Percent of GDP';
+	dv.opt.format.height = 'GDP';
+	dv.opt.data.power = 2;
+	if (duration) { dv.update.data(duration); }
+};
+
+dv.update.data = function(duration) {
+	//dv.create.countryList();
+	dv.update.subset();
+	dv.create.scales();
+
+	dv.svg.label.left.text.data(dv.data.subset);
+	dv.svg.label.right.text.data(dv.data.subset);
+	dv.svg.axis.data(dv.data.years.selected);
+	dv.svg.flowLines.data(dv.data.subset);
+	dv.svg.label.x.text.data(dv.data.years.selected);
+	dv.svg.lineLabels.data(dv.data.years.selected);
+
+	dv.update.resize(duration);
+};
+
+dv.update.resize = function(duration) {
+	if (!duration) { duration = 0; }
 	dv.create.dims();
 
 	dv.create.yscale();
@@ -738,9 +765,9 @@ dv.update.resize = function() {
 	dv.scale.y.rangeRound([dv.opt.line.minHeight, dv.dim.yscale]);
 
 	dv.redraw.svg();
-	dv.redraw.paths();
-	dv.redraw.yLabels('right');
-	dv.redraw.yLabels('left');
+	dv.redraw.paths(duration);
+	dv.redraw.yLabels('right', duration);
+	dv.redraw.yLabels('left', duration);
 	dv.redraw.xLabels();
 	dv.redraw.axis();
 };
@@ -752,9 +779,10 @@ dv.redraw.svg = function() {
 	dv.svg.svg.attr('width', dv.dim.win.w).attr('height', dv.dim.win.h);
 };
 
-dv.redraw.yLabels = function(side) {
+dv.redraw.yLabels = function(side, duration) {
 	var translate = dv.opt.label.left,
 		size = dv.scale.ylabel(dv.dim.chart.h);
+	if (!duration) { duration = 0; }
 	if(side === 'left') {
 		translate -= dv.opt.label.pad;
 	} else {
@@ -763,6 +791,7 @@ dv.redraw.yLabels = function(side) {
 
 	dv.svg.label[side].g.attr('transform', 'translate(' + translate + ',0)');
 	dv.svg.label[side].text
+		.transition().duration(duration)
 		.style('font-size', size)
 		.attr('dy', function(d) { return dv.calc.labelOffset(d, side); });
 };
@@ -798,8 +827,9 @@ dv.redraw.axis = function() {
 	;
 };
 
-dv.redraw.paths = function() {
+dv.redraw.paths = function(duration) {
 	dv.svg.flowLines
+		.transition().duration(duration)
 		.attr('d', function(d) { return dv.draw.flowLine(d); });
 };
 
@@ -864,6 +894,31 @@ dv.format.debt = function(num) {
 dv.format.GDP = function(num) {
 	num = Math.round(num * 100) / 100;
 	return num;
+};
+
+dv.calc.country = function(country, first) {
+	var years = dv.data.years.selected,
+		fullCountry = dv.dato.full[country.name],
+		i, year, scaledValue;
+
+	for (i = years.length - 1; i >= 0; i--) {
+		year = years[i];
+		country.height[year] = fullCountry.data[dv.opt.data.height][year];
+		country.rank[year] = fullCountry.data[dv.opt.data.rank][year];
+
+		// calculates max, min, and sums per year for use in scales
+		scaledValue = dv.scale.pow(country.height[year]);
+		if (first) {
+			dv.dato.sum[year] = scaledValue;
+			dv.dato.max[year] = scaledValue;
+			dv.dato.min[year] = scaledValue;
+		} else {
+			dv.dato.sum[year] += scaledValue;
+			dv.dato.max[year] = d3.max([scaledValue, dv.dato.max[year]]);
+			dv.dato.min[year] = d3.min([scaledValue, dv.dato.min[year]]);
+		}
+	}
+	return country;
 };
 
 
