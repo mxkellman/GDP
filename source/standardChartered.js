@@ -1,10 +1,9 @@
 /*
-
 Bugs
-• Font-Sizing
+• uses total dataset for min/max in scales - should use subset
+• add another gradient stop to make it banded instead of gradiented
 
 Small Enhancements
-• Move the hover data to directly above the chart line
 • Update the informational text
 
 Medium Enhancements
@@ -53,7 +52,11 @@ var dv = {
 
 // dv.opt stores all options that can be changed 'on the fly'
 dv.opt = {
-	colors: ['#08519c','#4292c6','#6baed6','#789','#74c476','#238b45','#00441b'],
+	color: {
+		twocolor: ['#6baed6','#567','#74c476','#00441b','#4292c6','#08519c','#238b45'],
+		contrast: ['#660000','#567','#815800','#00441b','#4B178F','#08519c','#238b45']
+	},
+	gradient: true,
 	years: {
 		first: 2003,
 		last: 2013,
@@ -61,7 +64,7 @@ dv.opt = {
 	},
 	countries: {
 		count: 20,
-		default: [],
+		default: ['Greece'],
 	},
 	data: {
 		select: 'Gross domestic product, current prices - U.S. dollars',
@@ -143,6 +146,7 @@ dv.postload.data = function() {
 	dv.create.prescales();
 	dv.create.subset();
 	dv.create.scales();
+	dv.draw.gradients();
 	dv.draw.flowChart();
 	dv.draw.lineLabels();
 };
@@ -176,6 +180,7 @@ dv.create.variables = function() {
 		min: {},
 		sum: {},
 	};
+	dv.opt.colors = dv.opt.color.twocolor;
 
 	dv.create.dims();
 	dv.create.years();
@@ -376,16 +381,18 @@ dv.create.scales = function() {
 	var width = dv.dim.chart.w,
 		lineopt = dv.opt.line,
 		minHeight = lineopt.minHeight,
-		max = 0,
+		sum = 0,
 		min = 0,
+		max = 0,
 		years = dv.data.years.selected,
 		subset = dv.data.subset,
 		sorted = dv.data.sorted,
-		i, year, length, i2, offset, country, j;
+		i, year, length, i2, offset, country, j, color, newcolor;
 
 	for (i = years.length - 1; i >= 0; i--) {
 		year = years[i];
-		max = d3.max([dv.dato.sum[year], max]);
+		sum = d3.max([dv.dato.sum[year], sum]);
+		max = d3.max([dv.dato.max[year], max]);
 		min = d3.min([dv.dato.min[year], min]);
 
 		offset = 0;
@@ -412,7 +419,7 @@ dv.create.scales = function() {
 	;
 
 	dv.scale.y = d3.scale.linear()
-		.domain([min, max])
+		.domain([min, sum])
 		.rangeRound([minHeight, dv.dim.yscale])
 	;
 
@@ -450,6 +457,16 @@ dv.create.scales = function() {
 	};
 
 	dv.scale.color = d3.scale.ordinal().range(dv.opt.colors);
+
+	dv.scale.grad = {};
+	dv.scale.grad.twocolor = d3.scale.linear().range(['#050','#800']).domain([0, 1.2]).clamp(true);
+	for (i = dv.opt.colors.length - 1; i >= 0; i--) {
+		color = dv.opt.colors[i];
+		dv.scale.grad[color] = d3.scale.linear().range(["#FFF", color]).domain([0, 1]);
+		newcolor = dv.scale.grad[color](0.5);
+		//dv.scale.grad[color].range([newcolor, color]).domain([min, max]);
+		dv.scale.grad[color].range([newcolor, color]);
+	}
 };
 
 
@@ -462,7 +479,7 @@ dv.write.header = function() {
 dv.write.text = function() {
 	dv.html.text = dv.html.body.append('div')
 		.attr('class', 'explanation')
-		.html("Bar Height: <a href='javascript:dv.update.heightByDebt(1000)'>Debt</a> | <a href='javascript:dv.update.heightByRatio(1000)'>Debt/GDP Ratio</a> :: Bar Order: <a href='javascript:dv.update.rankByDebt(1000)'>Debt</a> | <a href='javascript:dv.update.rankByRatio(1000)'>Debt/GDP Ratio</a>");
+		.html("Bar Height: <a href='javascript:dv.update.height.debt(1000)'>Debt</a> | <a href='javascript:dv.update.height.ratio(1000)'>Debt/GDP Ratio</a> :: Bar Order: <a href='javascript:dv.update.rank.debt(1000)'>Debt</a> | <a href='javascript:dv.update.rank.ratio(1000)'>Debt/GDP Ratio</a>");
 };
 
 
@@ -471,7 +488,7 @@ dv.write.text = function() {
 dv.draw.svg = function() {
 	var	margin = dv.opt.margin;
 
-	dv.svg.svg = dv.html.body.append('svg');
+	dv.svg.svg = dv.html.body.append('svg:svg');
 	dv.svg.main = dv.svg.svg
 		.append('svg:g')
 			.attr('transform', 'translate(' + margin.left + ',' + margin.top + ')')
@@ -525,12 +542,11 @@ dv.draw.flowLines = function() {
 		.selectAll('path')
 		.data(dv.data.subset)
 		.enter().append('svg:path')
-			.style('fill', function(d) { return dv.scale.color(d.region); })
 			.style('fill-opacity', dv.opt.opacity.norm)
 			.on('mouseover', function(d, i) { mouseon(event, d, i); })
 			.on('mouseout', mouseoff)
 	;
-	dv.redraw.paths();
+	dv.redraw.flowLines();
 };
 
 dv.draw.yLabels = function(side) {
@@ -588,20 +604,20 @@ dv.draw.flowLine = function(country) {
 
 	function drawP(array) {
 		var i,
-			string = array[0],
+			string = Math.round(array[0]),
 			length = array.length;
 		for (i = 1; i < length; i++) {
-			string += ',' + array[i];
+			string += ',' + Math.round(array[i]);
 		}
 		return string;
 	}
 
 	function drawV(y) {
-		return ' V' + y;
+		return ' V' + Math.round(y);
 	}
 
 	function drawH(y) {
-		return ' H' + y;
+		return ' H' + Math.round(y);
 	}
 
 	function drawC(x1,y1,x2,y2,x,y) {
@@ -683,60 +699,72 @@ dv.draw.lineLabels = function() {
 	;
 };
 
-dv.redraw.lineLabels = function(country) {
-	var width = dv.scale.x(dv.data.years.selected[1]) - dv.scale.x(dv.data.years.selected[0]),
-		size = dv.scale.lineLabel(dv.dim.chart.h);
+dv.draw.gradients = function() {
+	var gradient, color,
+		length = dv.data.years.selected.length;
 
-	dv.svg.lineLabels
-		.attr('class','line-label')
-		.attr('width', width)
-		.style('font-size', size)
-		.attr('dx', function(d, i) { return (dv.scale.x(dv.data.years.selected[i-1]) + width / 2); })
-		.attr('dy', function(d) {
-			var height = dv.scale.yHigh(country, d) - 5;
-			if (height < 15) { height = dv.scale.yLow(country, d) + 15; }
-			return height;
-		})
-		.text(function(d) { return dv.format[dv.opt.format.height](country.height[d]); })
-		.style('opacity', 0.25)
-		.transition().duration(250)
-		.style('opacity', 1)
-		.style('visibility', function(d, i) {
-			if (i === 0) {
-				return 'hidden';
-			} else if ( width < 40 && i%2 === 0) {
-				return 'hidden';
-			} else { return 'visible'; }
-		})
+	dv.svg.gradients = dv.svg.main.append('svg:g').selectAll('linearGradient')
+		.data(dv.data.subset)
+		.enter().append('svg:linearGradient')
+			.attr('x1', '0%')
+			.attr('y1', '0%')
+			.attr('x2', '100%')
+			.attr('y2', '0%')
+			.attr('id', function(d) {
+				gradient = d3.select(this);
+				gradient.selectAll('stop')
+					.data(dv.data.years.selected)
+					.enter().append('svg:stop')
+						.attr('offset', function(d2, i2) {
+							return Math.round(i2 / length * 100) + '%';
+						})
+						.style('stop-color', function(d2) {
+							//color = dv.scale.color(d.region);
+							color = 'twocolor';
+							return dv.scale.grad[color](d.height[d2]);
+						})
+						.style('stop-opacity', 1)
+				;
+				return 'grad-' + d.code;
+			})
 	;
 };
 
 
 /* UPDATE: Update data, or many different types of things */
 
-dv.update.rankByDebt = function(duration) {
+dv.update.rank = {};
+dv.update.height = {};
+dv.update.gradient = {};
+
+dv.update.rank.debt = function(duration) {
 	dv.opt.data.rank = 'Debt';
 	dv.opt.format.rank = 'debt';
 	if (duration) { dv.update.data(duration); }
 };
 
-dv.update.heightByDebt = function(duration) {
+dv.update.height.debt = function(duration) {
 	dv.opt.data.height = 'Debt';
 	dv.opt.format.height = 'debt';
 	dv.opt.data.power = 1;
 	if (duration) { dv.update.data(duration); }
 };
 
-dv.update.rankByRatio = function(duration) {
+dv.update.rank.ratio = function(duration) {
 	dv.opt.data.rank = 'General government net debt - Percent of GDP';
 	dv.opt.format.rank = 'GDP';
 	if (duration) { dv.update.data(duration); }
 };
 
-dv.update.heightByRatio = function(duration) {
+dv.update.height.ratio = function(duration) {
 	dv.opt.data.height = 'General government net debt - Percent of GDP';
 	dv.opt.format.height = 'GDP';
 	dv.opt.data.power = 2;
+	if (duration) { dv.update.data(duration); }
+};
+
+dv.update.gradient.none = function(duration) {
+	dv.opt.colors = ['#6baed6','#567','#74c476','#00441b','#4292c6','#08519c','#238b45'];
 	if (duration) { dv.update.data(duration); }
 };
 
@@ -765,7 +793,7 @@ dv.update.resize = function(duration) {
 	dv.scale.y.rangeRound([dv.opt.line.minHeight, dv.dim.yscale]);
 
 	dv.redraw.svg();
-	dv.redraw.paths(duration);
+	dv.redraw.flowLines(duration);
 	dv.redraw.yLabels('right', duration);
 	dv.redraw.yLabels('left', duration);
 	dv.redraw.xLabels();
@@ -827,11 +855,47 @@ dv.redraw.axis = function() {
 	;
 };
 
-dv.redraw.paths = function(duration) {
+dv.redraw.flowLines = function(duration) {
 	dv.svg.flowLines
 		.transition().duration(duration)
+		.style('fill', function(d) {
+			if (dv.opt.gradient) {
+				return 'url(#grad-' + d.code + ')';
+			} else {
+				return dv.scale.color(d.region);
+			}
+		})
 		.attr('d', function(d) { return dv.draw.flowLine(d); });
 };
+
+dv.redraw.lineLabels = function(country) {
+	var width = dv.scale.x(dv.data.years.selected[1]) - dv.scale.x(dv.data.years.selected[0]),
+		size = dv.scale.lineLabel(dv.dim.chart.h);
+
+	dv.svg.lineLabels
+		.attr('class','line-label')
+		.attr('width', width)
+		.style('font-size', size)
+		.attr('dx', function(d, i) { return (dv.scale.x(dv.data.years.selected[i-1]) + width / 2); })
+		.attr('dy', function(d) {
+			var height = dv.scale.yHigh(country, d) - 5;
+			if (height < 15) { height = dv.scale.yLow(country, d) + 15; }
+			return height;
+		})
+		.text(function(d) { return dv.format[dv.opt.format.height](country.height[d]); })
+		.style('opacity', 0.25)
+		.transition().duration(250)
+		.style('opacity', 1)
+		.style('visibility', function(d, i) {
+			if (i === 0) {
+				return 'hidden';
+			} else if ( width < 40 && i%2 === 0) {
+				return 'hidden';
+			} else { return 'visible'; }
+		})
+	;
+};
+
 
 
 /* REWRITE: Used for updating the contents of HTML elements */
@@ -1055,4 +1119,5 @@ dv.create.start();
 	Gross domestic product corresponding to fiscal year, current prices - National currency
 	Current account balance - U.S. dollars
 	Current account balance - Percent of GDP
+
 */
