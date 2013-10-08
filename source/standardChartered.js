@@ -1,7 +1,5 @@
 /*
 Bugs
-• uses total dataset for min/max in scales - should use subset
-• add another gradient stop to make it banded instead of gradiented
 
 Small Enhancements
 • Update the informational text
@@ -68,13 +66,14 @@ dv.opt = {
 	},
 	data: {
 		select: 'Gross domestic product, current prices - U.S. dollars',
-		height: 'General government net debt - Percent of GDP',
+		height: 'Debt',
 		rank: 'General government net debt - Percent of GDP',
-		power: 2,
+		gradient: 'General government net debt - Percent of GDP',
+		power: 1,
 	},
 	format: {
-		height: 'GDP',
-		rank: 'debt',
+		height: 'debt',
+		rank: 'GDP',
 	},
 	path: {
 		data: 'data/WEO-All.csv',
@@ -179,6 +178,10 @@ dv.create.variables = function() {
 		max: {},
 		min: {},
 		sum: {},
+		maxHeight: {},
+		minHeight: {},
+		maxGradient: {},
+		minGradient: {},
 	};
 	dv.opt.colors = dv.opt.color.twocolor;
 
@@ -189,20 +192,14 @@ dv.create.variables = function() {
 dv.create.years = function() {
 	// sets up max, min, and sum for use in scales
 	var opt = dv.opt.years,
-		years = dv.data.years,
-		i, year;
+		years = dv.data.years;
+
 	if (opt.continuous) {
 		years.selected = dv.calc.years(opt.first, opt.last);
 	} else {
 		years.selected = [opt.first, opt.last];
 	}
 	years.all = dv.calc.years(years.first, years.last);
-	for (i = years.selected.length - 1; i >= 0; i--) {
-		year = years.selected[i];
-		dv.dato.sum[year] = 0;
-		dv.dato.max[year] = 0;
-		dv.dato.min[year] = 0;
-	}
 };
 
 // figure out how big everything needs to be
@@ -341,6 +338,7 @@ dv.create.subset = function() {
 		country.rank = {};
 		country.offset = {};
 		country.order = {};
+		country.gradient = {};
 
 
 		if (i === countries.length - 1) { first = true; } else { first = false; }
@@ -380,20 +378,27 @@ dv.create.scales = function() {
 	// calculate offset and order for each year
 	var width = dv.dim.chart.w,
 		lineopt = dv.opt.line,
-		minHeight = lineopt.minHeight,
 		sum = 0,
-		min = 0,
 		max = 0,
+		min = 0,
+		maxHeight = 0,
+		minHeight = 0,
+		maxGradient = 0,
+		minGradient = 0,
 		years = dv.data.years.selected,
 		subset = dv.data.subset,
 		sorted = dv.data.sorted,
-		i, year, length, i2, offset, country, j, color, newcolor;
+		i, year, length, i2, offset, country, j;
 
 	for (i = years.length - 1; i >= 0; i--) {
 		year = years[i];
 		sum = d3.max([dv.dato.sum[year], sum]);
 		max = d3.max([dv.dato.max[year], max]);
 		min = d3.min([dv.dato.min[year], min]);
+		maxHeight = d3.max([dv.dato.maxHeight[year], maxHeight]);
+		minHeight = d3.min([dv.dato.minHeight[year], minHeight]);
+		maxGradient = d3.max([dv.dato.maxGradient[year], maxGradient]);
+		minGradient = d3.min([dv.dato.minGradient[year], minGradient]);
 
 		offset = 0;
 		dv.util.aooSort({ array: sorted, key: ['rank', year] });
@@ -420,7 +425,7 @@ dv.create.scales = function() {
 
 	dv.scale.y = d3.scale.linear()
 		.domain([min, sum])
-		.rangeRound([minHeight, dv.dim.yscale])
+		.rangeRound([lineopt.minHeight, dv.dim.yscale])
 	;
 
 	dv.scale.ypow = function(y) {
@@ -458,15 +463,10 @@ dv.create.scales = function() {
 
 	dv.scale.color = d3.scale.ordinal().range(dv.opt.colors);
 
-	dv.scale.grad = {};
-	dv.scale.grad.twocolor = d3.scale.linear().range(['#050','#800']).domain([0, 1.2]).clamp(true);
-	for (i = dv.opt.colors.length - 1; i >= 0; i--) {
-		color = dv.opt.colors[i];
-		dv.scale.grad[color] = d3.scale.linear().range(["#FFF", color]).domain([0, 1]);
-		newcolor = dv.scale.grad[color](0.5);
-		//dv.scale.grad[color].range([newcolor, color]).domain([min, max]);
-		dv.scale.grad[color].range([newcolor, color]);
-	}
+	dv.scale.gradient = d3.scale.sqrt()
+		.range(['#050','#800'])
+		.domain([minGradient, maxGradient])
+	;
 };
 
 
@@ -700,9 +700,7 @@ dv.draw.lineLabels = function() {
 };
 
 dv.draw.gradients = function() {
-	var gradient, color,
-		length = dv.data.years.selected.length;
-
+	var gradient, length = dv.data.years.selected.length;
 	dv.svg.gradients = dv.svg.main.append('svg:g').selectAll('linearGradient')
 		.data(dv.data.subset)
 		.enter().append('svg:linearGradient')
@@ -715,19 +713,13 @@ dv.draw.gradients = function() {
 				gradient.selectAll('stop')
 					.data(dv.data.years.selected)
 					.enter().append('svg:stop')
-						.attr('offset', function(d2, i2) {
-							return Math.round(i2 / length * 100) + '%';
-						})
-						.style('stop-color', function(d2) {
-							//color = dv.scale.color(d.region);
-							color = 'twocolor';
-							return dv.scale.grad[color](d.height[d2]);
-						})
+						.attr('offset', function(d2, i2) { return Math.round(i2 / length * 100) + '%'; })
 						.style('stop-opacity', 1)
 				;
 				return 'grad-' + d.code;
 			})
 	;
+	dv.redraw.gradients(0);
 };
 
 
@@ -763,8 +755,25 @@ dv.update.height.ratio = function(duration) {
 	if (duration) { dv.update.data(duration); }
 };
 
-dv.update.gradient.none = function(duration) {
-	dv.opt.colors = ['#6baed6','#567','#74c476','#00441b','#4292c6','#08519c','#238b45'];
+dv.update.gradient.off = function(duration) {
+	dv.opt.gradient = false;
+	if (duration) { dv.update.data(duration); }
+};
+
+dv.update.gradient.on = function(duration) {
+	dv.opt.gradient = true;
+	if (duration) { dv.update.data(duration); }
+};
+
+dv.update.gradient.ratio = function(duration) {
+	dv.opt.gradient = true;
+	dv.opt.data.gradient = 'General government net debt - Percent of GDP';
+	if (duration) { dv.update.data(duration); }
+};
+
+dv.update.gradient.debt = function(duration) {
+	dv.opt.gradient = true;
+	dv.opt.data.gradient = 'Debt';
 	if (duration) { dv.update.data(duration); }
 };
 
@@ -794,6 +803,7 @@ dv.update.resize = function(duration) {
 
 	dv.redraw.svg();
 	dv.redraw.flowLines(duration);
+	dv.redraw.gradients(duration);
 	dv.redraw.yLabels('right', duration);
 	dv.redraw.yLabels('left', duration);
 	dv.redraw.xLabels();
@@ -896,6 +906,18 @@ dv.redraw.lineLabels = function(country) {
 	;
 };
 
+dv.redraw.gradients = function(duration) {
+	var gradient;
+	dv.svg.gradients
+		.attr('', function(d) {
+			gradient = d3.select(this);
+			gradient.selectAll('stop')
+				.transition().duration(duration)
+				.style('stop-color', function(d2) { return dv.scale.gradient(d.gradient[d2]); })
+			;
+		})
+	;
+};
 
 
 /* REWRITE: Used for updating the contents of HTML elements */
@@ -963,23 +985,34 @@ dv.format.GDP = function(num) {
 dv.calc.country = function(country, first) {
 	var years = dv.data.years.selected,
 		fullCountry = dv.dato.full[country.name],
-		i, year, scaledValue;
+		i, year, value, scaledValue, gradient;
 
 	for (i = years.length - 1; i >= 0; i--) {
 		year = years[i];
 		country.height[year] = fullCountry.data[dv.opt.data.height][year];
 		country.rank[year] = fullCountry.data[dv.opt.data.rank][year];
+		country.gradient[year] = fullCountry.data[dv.opt.data.gradient][year];
 
 		// calculates max, min, and sums per year for use in scales
-		scaledValue = dv.scale.pow(country.height[year]);
+		value = country.height[year];
+		scaledValue = dv.scale.pow(value);
+		gradient = country.gradient[year];
 		if (first) {
 			dv.dato.sum[year] = scaledValue;
 			dv.dato.max[year] = scaledValue;
 			dv.dato.min[year] = scaledValue;
+			dv.dato.maxHeight[year] = value;
+			dv.dato.minHeight[year] = value;
+			dv.dato.maxGradient[year] = gradient;
+			dv.dato.minGradient[year] = gradient;
 		} else {
 			dv.dato.sum[year] += scaledValue;
 			dv.dato.max[year] = d3.max([scaledValue, dv.dato.max[year]]);
 			dv.dato.min[year] = d3.min([scaledValue, dv.dato.min[year]]);
+			dv.dato.maxHeight[year] = d3.max([value, dv.dato.maxHeight[year]]);
+			dv.dato.minHeight[year] = d3.min([value, dv.dato.minHeight[year]]);
+			dv.dato.maxGradient[year] = d3.max([gradient, dv.dato.maxGradient[year]]);
+			dv.dato.minGradient[year] = d3.min([gradient, dv.dato.minGradient[year]]);
 		}
 	}
 	return country;
