@@ -133,7 +133,7 @@ dv.opt = {
 		},{	rank: 'General government gross debt - Percent of GDP',
 			height: 'Debt',
 			label: 'General government gross debt - Percent of GDP',
-			format: 'ratio',
+			format: 'percent',
 			gradient: 'General government gross debt - Percent of GDP',
 			title: 'Debt to GDP Ratio',
 			descr: "The ratio of a country's gross debt to its GDP is an important overall indicator of economic health.  A country that consistently carries more than 60% of its GDP as debt is considered unhealthy and is colored red.",
@@ -1173,13 +1173,12 @@ dv.calc.nextView = function() {
 dv.format.ratio = function(num) {
 	var sign;
 	num = Math.round(num * 100)/100;
-	sign = num > 0 ? '+' : '';
-	return sign + num;
+	return num;
 };
 
 dv.format.percent = function(num) {
 	num = Math.round(num * 100);
-	num = num > 0 ? '+' + num : num;
+	//num = num > 0 ? '+' + num : num;
 	return num + '%';
 };
 
@@ -1192,7 +1191,7 @@ dv.format.bigDollar = function(num) {
 	if (abs < 999) { abbvr = "B"; }
 	else { factor = 1000; abbvr =  "T"; }
 	abs = abs > 999 ? Math.round(abs/factor*10)/10 : Math.round(abs/factor);
-	num = num < 0 ? '-' + symbol + abs : '+' + symbol + abs;
+	num = num < 0 ? '-' + symbol + abs : symbol + abs;
 	return num + abbvr;
 };
 
