@@ -52,7 +52,7 @@ var dv = {
 dv.opt = {
 	colors: ['#6baed6','#567','#74c476','#00441b','#4292c6','#08519c','#238b45'],
 	countries: {
-		count: 22,
+		count: 20,
 		default: ['Greece','Argentina'],
 	},
 	data: {
@@ -65,7 +65,7 @@ dv.opt = {
 	},
 	duration: 1000,
 	format: {
-		label: 'debt',
+		label: 'bigDollar',
 	},
 	path: {
 		data: 'data/WEO-All.csv',
@@ -105,6 +105,46 @@ dv.opt = {
 		w: 500
 	},
 	text: '',
+	views: [
+		{	rank: 'Gross domestic product, current prices - U.S. dollars',
+			height: 'Gross domestic product, current prices - U.S. dollars',
+			label: 'Gross domestic product, current prices - U.S. dollars',
+			format: 'bigDollar',
+			gradient: false,
+			title: 'Gross Domestic Product (GDP)',
+			descr: "GDP for the top 20 countries, plus Greece and Argentina, are shown below. The height of each bar shows the relative size of the country's GDP, and the bars are ordered from largest GDP to smallest.",
+			bigLoss: 'Smallest total GDP growth',
+			bigGain: 'Largest total GDP growth',
+			bigLossYear: 'Largest 1yr GDP loss',
+			bigGainYear: 'Largest 1yr GDP growth',
+			linkTo: 'GDP',
+		},{	rank: 'Debt',
+			height: 'Debt',
+			label: 'Debt',
+			format: 'bigDollar',
+			gradient: false,
+			title: 'Debt',
+			descr: "The height and order of the bars now shows the gross debt in US Dollars for each country. The height of all of the bars together shows the total debt carried by these countries.",
+			bigLoss: 'Largest total drop in debt',
+			bigGain: 'Largest total growth in debt',
+			bigLossYear: 'Largest 1yr drop in debt',
+			bigGainYear: 'Largest 1yr growth in debt',
+			linkTo: 'Debt',
+		},{	rank: 'General government gross debt - Percent of GDP',
+			height: 'Debt',
+			label: 'General government gross debt - Percent of GDP',
+			format: 'ratio',
+			gradient: 'General government gross debt - Percent of GDP',
+			title: 'Debt to GDP Ratio',
+			descr: "The ratio of a country's gross debt to its GDP is an important overall indicator of economic health.  A country that consistently carries more than 60% of its GDP as debt is considered unhealthy and is colored red.",
+			bigLoss: 'Largest total drop in Debt/GDP',
+			bigGain: 'Largest total rise in Debt/GDP',
+			bigLossYear: 'Largest 1yr drop in Debt/GDP',
+			bigGainYear: 'Largest 1yr rise in Debt/GDP',
+			linkTo: 'Debt to GDP ratio',
+		},
+	],
+
 	years: {
 		first: 2002,
 		last: 2013,
@@ -142,10 +182,18 @@ dv.postload.data = function() {
 	dv.create.countryList();
 	dv.create.prescales();
 	dv.create.subset();
+
+	dv.update.view();
+	dv.rewrite.stats();
+
+	dv.create.dims();
 	dv.create.scales();
+
 	dv.draw.gradients();
 	dv.draw.flowChart();
 	dv.draw.lineLabels();
+
+	dv.update.resize();
 };
 
 
@@ -153,6 +201,9 @@ dv.postload.data = function() {
 
 dv.create.start = function() {
 	dv.create.variables();
+	dv.create.years();
+	dv.write.header();
+	
 	dv.load.data();
 };
 
@@ -171,6 +222,7 @@ dv.create.variables = function() {
 			selected: [],
 		},
 	};
+
 	dv.dato = {
 		full: {},
 		max: {},
@@ -181,15 +233,9 @@ dv.create.variables = function() {
 		maxGradient: {},
 		minGradient: {},
 	};
-	dv.create.defaultText();
 
+	dv.state.view = -1;
 	dv.html.body = d3.select('body');
-	dv.write.header();
-	dv.write.descr();
-
-
-	dv.create.dims();
-	dv.create.years();
 };
 
 dv.create.defaultText = function() {
@@ -239,6 +285,7 @@ dv.create.dims = function() {
 		h: dv.dim.win.h - margin.top - margin.bottom - dv.html.svg.offsetTop - dv.dim.body.bottom,
 		w: dv.dim.win.w - margin.left - margin.right - dv.html.svg.offsetLeft - dv.dim.body.right,
 	};
+
 	dv.dim.svg.h = dv.dim.svg.h < mindim.h ? mindim.h : dv.dim.svg.h;
 	dv.dim.svg.w = dv.dim.svg.w < mindim.w ? mindim.w : dv.dim.svg.w;
 
@@ -336,6 +383,7 @@ dv.create.subset = function() {
 		first = false,
 		i, name, country, fullCountry;
 
+	dv.create.stats();
 	for (i = countries.length - 1; i >= 0; i--) {
 		name = countries[i];
 		fullCountry = full[name];
@@ -471,18 +519,44 @@ dv.create.scales = function() {
 	}
 };
 
-
-/* WRITE: Write out html elements */
-dv.write.header = function() {
-	dv.html.header = dv.html.body.append('h1')
-		.html('GDP & Debt');
+dv.create.stats = function() {
+	dv.data.sorted = [];
+	dv.data.stats = {};
+	dv.data.stats.bigGain = {name:'', val:0};
+	dv.data.stats.bigLoss = {name:'', val:0};
+	dv.data.stats.bigGainYear = {name:'', val:0, year: 0};
+	dv.data.stats.bigLossYear = {name:'', val:0, year: 0};
 };
 
-dv.write.descr = function() {
-	dv.html.descr = dv.html.body.append('div')
-		.attr('class', 'explanation')
-	;
-	dv.rewrite.descr();
+/* WRITE: Write out html elements */
+
+// helper function expects {name: aName, type: elementType, target: d3.selected.div, css: optionalClassName, html: optionalHTML }
+dv.write.html = function(o) {
+	if (!o.target) {o.target = dv.html.body;}
+	if (o.name && o.type) {
+		dv.html[o.name] = o.target.append(o.type);
+		if (!o.css) {o.css = o.name;}
+		dv.html[o.name].attr('class', o.css);
+		if (o.html) {dv.html[o.name].html(o.html);}
+	}
+};
+
+dv.write.header = function() {
+	dv.write.html({name: 'header', type: 'div'});
+	dv.write.html({name: 'title', type: 'h1', html: 'GDP & Debt', target: dv.html.header});
+	dv.write.html({name: 'subTitle', type: 'h5', target: dv.html.header});
+	dv.write.html({name: 'linkTo', type: 'a', target: dv.html.header});
+	dv.html.linkTo.on('click', function() { return dv.update.view(dv.opt.duration); });
+	dv.write.html({name: 'descr', type: 'div', target: dv.html.header});
+	dv.write.html({name: 'stats', type: 'div', target: dv.html.header});
+	dv.write.html({name: 'bigLoss', type: 'div', css: 'stat', target: dv.html.stats});
+	dv.write.html({name: 'bigGain', type: 'div', css: 'stat', target: dv.html.stats});
+	dv.write.html({name: 'bigLossYear', type: 'div', css: 'stat', target: dv.html.stats});
+	dv.write.html({name: 'bigGainYear', type: 'div', css: 'stat', target: dv.html.stats});
+
+	dv.html.stats.selectAll('.stat').append('div').attr('class','number');
+	dv.html.stats.selectAll('.stat').append('div').attr('class','country');
+	dv.html.stats.selectAll('.stat').append('div').attr('class','descr');
 };
 
 
@@ -520,7 +594,6 @@ dv.draw.axis = function() {
 			.attr('y', dv.opt.margin.top)
 			.style('display', function(d, i) { if (i === dv.data.years.selected.length - 1) { return 'none'; } else { return false; } })
 	;
-	dv.redraw.axis();
 };
 
 dv.draw.flowLines = function() {
@@ -528,7 +601,7 @@ dv.draw.flowLines = function() {
 		dv.svg.flowLines.transition().duration(10)
 			.style('fill-opacity', function(d, i) { if (i === index) { return dv.opt.opacity.high; } else { return dv.opt.opacity.low; } })
 		;
-		d3.selectAll('.' + d.code).style('font-weight', 'bold');
+		d3.selectAll('.' + d.code).style('font-weight', '400').style('fill', '#222');
 		dv.redraw.lineLabels(d);
 	}
 
@@ -539,8 +612,8 @@ dv.draw.flowLines = function() {
 		dv.svg.lineLabels.transition().duration(250)
 			.style('opacity', 0)
 		;
-		dv.svg.label.left.text.style('font-weight','normal');
-		dv.svg.label.right.text.style('font-weight','normal');
+		dv.svg.label.left.text.style('font-weight','300').style('fill', '#555');
+		dv.svg.label.right.text.style('font-weight','300').style('fill', '#555');
 	}
 
 	dv.svg.flowLines = dv.svg.chart.append('svg:g')
@@ -552,7 +625,6 @@ dv.draw.flowLines = function() {
 			.on('mouseover', function(d, i) { mouseon(event, d, i); })
 			.on('mouseout', mouseoff)
 	;
-	dv.redraw.flowLines();
 };
 
 dv.draw.yLabels = function(side) {
@@ -577,7 +649,6 @@ dv.draw.yLabels = function(side) {
 			.attr('text-anchor', anchor)
 			.text(function(d) { return d.name; })
 	;
-	dv.redraw.yLabels(side);
 };
 
 dv.draw.xLabels = function() {
@@ -591,7 +662,6 @@ dv.draw.xLabels = function() {
 			.attr('text-anchor', 'middle')
 			.text(function(d) { return d; })
 	;
-	dv.redraw.xLabels();
 };
 
 dv.draw.flowLine = function(country) {
@@ -726,41 +796,35 @@ dv.draw.gradients = function() {
 				return 'grad-' + d.code;
 			})
 	;
-	dv.redraw.gradients(0);
 };
 
 
 /* UPDATE: Update data, or many different types of things */
 
-dv.update.option1 = function() {
-	dv.opt.data.rank = 'Gross domestic product, current prices - U.S. dollars';
-	dv.opt.data.height = 'Gross domestic product, current prices - U.S. dollars';
-	dv.opt.data.label = dv.opt.data.height;
-	dv.opt.format.label = 'debt';
-	dv.opt.data.gradient = false;
-	dv.update.data(dv.opt.duration);
-};
+dv.update.view = function(duration) {
+	dv.state.view = dv.calc.nextView();
+	var view = dv.opt.views[dv.state.view],
+		nextView = dv.calc.nextView(),
+		nextHTML = dv.opt.views[nextView].linkTo;
 
-dv.update.option2 = function() {
-	dv.opt.data.rank = 'Debt';
-	dv.opt.data.height = 'Debt';
-	dv.opt.data.label = dv.opt.data.height;
-	dv.opt.format.label = 'debt';
-	dv.opt.data.gradient = false;
-	dv.update.data(dv.opt.duration);
-};
+	if (nextView === 0) {nextHTML = 'Start Over with ' + nextHTML;} else {nextHTML = 'Show changes in ' + nextHTML;}
+	dv.opt.data.rank = view.rank;
+	dv.opt.data.height = view.height;
+	dv.opt.data.gradient = view.gradient;
+	dv.opt.data.label = view.label;
+	dv.opt.format.label = view.format;
 
-dv.update.option3 = function() {
-	dv.opt.data.rank = 'General government gross debt - Percent of GDP';
-	dv.opt.data.height = 'Debt';
-	dv.opt.data.label = dv.opt.data.rank;
-	dv.opt.format.label = 'GDP';
-	dv.opt.data.gradient = 'General government gross debt - Percent of GDP';
-	dv.update.data(dv.opt.duration);
+	if (duration) {
+		dv.update.data(duration);
+	}
+
+	dv.rewrite.fadeInOut({ele:dv.html.subTitle, duration:duration, html:view.title});
+	dv.rewrite.fadeInOut({ele:dv.html.descr, duration:duration, html:view.descr});
+	dv.rewrite.fadeInOut({ele:dv.html.linkTo, duration:duration, html:nextHTML});
+	dv.rewrite.stats(duration);
 };
 
 dv.update.data = function(duration) {
-	//dv.create.countryList();
 	dv.update.subset();
 	dv.create.scales();
 
@@ -775,13 +839,14 @@ dv.update.data = function(duration) {
 };
 
 dv.update.resize = function(duration) {
-	if (!duration) { duration = 0; }
-	dv.create.dims();
-
+	if (!duration) {
+		duration = 0;
+	}
 	dv.create.yscale();
-
+	dv.create.dims();
 	dv.scale.x.rangeRound([0, dv.dim.chart.w]);
 	dv.scale.y.rangeRound([dv.opt.line.minHeight, dv.dim.yscale]);
+
 
 	dv.redraw.svg();
 	dv.redraw.flowLines(duration);
@@ -797,7 +862,7 @@ dv.update.subset = function() {
 		first = false,
 		i, country;
 
-	dv.data.sorted = [];
+	dv.create.stats();
 
 	for (i = countries.length - 1; i >= 0; i--) {
 		country = countries[i];
@@ -810,7 +875,11 @@ dv.update.subset = function() {
 dv.update.country = function(country, first) {
 	var years = dv.data.years.selected,
 		fullCountry = dv.dato.full[country.name],
-		i, year, value, scaledValue, gradient;
+		bigLoss = dv.data.stats.bigLoss,
+		bigGain = dv.data.stats.bigGain,
+		bigLossYear = dv.data.stats.bigLossYear,
+		bigGainYear = dv.data.stats.bigGainYear,
+		i, year, value, labelValue, scaledValue, gradient, yearChange, totalChange;
 
 	for (i = years.length - 1; i >= 0; i--) {
 		year = years[i];
@@ -821,7 +890,8 @@ dv.update.country = function(country, first) {
 		} else {
 			country.gradient[year] = 0;
 		}
-		country.label[year] = dv.format[dv.opt.format.label](fullCountry.data[dv.opt.data.label][year]);
+		labelValue = fullCountry.data[dv.opt.data.label][year];
+		country.label[year] = dv.format[dv.opt.format.label](labelValue);
 		// calculates max, min, and sums per year for use in scales
 		value = country.height[year];
 		scaledValue = dv.scale.pow(value);
@@ -843,6 +913,28 @@ dv.update.country = function(country, first) {
 			dv.dato.maxGradient[year] = d3.max([gradient, dv.dato.maxGradient[year]]);
 			dv.dato.minGradient[year] = d3.min([gradient, dv.dato.minGradient[year]]);
 		}
+		if (i !== 0) {
+			yearChange = labelValue - fullCountry.data[dv.opt.data.label][years[i-1]];
+			if (yearChange < bigLossYear.val || bigLossYear.val === 0) {
+				bigLossYear.name = country.name;
+				bigLossYear.val = yearChange;
+				bigLossYear.year = year;
+			}
+			if (yearChange > bigGainYear.val || bigGainYear.val === 0) {
+				bigGainYear.name = country.name;
+				bigGainYear.val = yearChange;
+				bigGainYear.year = year;
+			}
+		}
+	}
+	totalChange = fullCountry.data[dv.opt.data.label][years[years.length - 1]] - fullCountry.data[dv.opt.data.label][years[1]];
+	if (totalChange < bigLoss.val || bigLoss.val === 0) {
+		bigLoss.name = country.name;
+		bigLoss.val = totalChange;
+	}
+	if (totalChange > bigGain.val || bigGain.val === 0) {
+		bigGain.name = country.name;
+		bigGain.val = totalChange;
 	}
 	return country;
 };
@@ -851,7 +943,7 @@ dv.update.country = function(country, first) {
 /* REDRAW: Used for sizing, resizing, or redrawing SVG elements */
 
 dv.redraw.svg = function() {
-	dv.svg.svg.attr('width', dv.dim.win.w).attr('height', dv.dim.win.h);
+	dv.svg.svg.attr('width', dv.dim.svg.w).attr('height', dv.dim.svg.h);
 };
 
 dv.redraw.yLabels = function(side, duration) {
@@ -904,10 +996,12 @@ dv.redraw.axis = function() {
 };
 
 dv.redraw.flowLines = function(duration) {
-	dv.svg.flowLines
-		.transition().duration(duration)
+	dv.svg.flowLines.style('pointer-events', 'none');
+	dv.svg.flowLines.transition().duration(duration)
 		.style('fill', function(d) { return 'url(#grad-' + d.code + ')'; })
-		.attr('d', function(d) { return dv.draw.flowLine(d); });
+		.attr('d', function(d) { return dv.draw.flowLine(d); })
+		.each('end', function() {dv.svg.flowLines.style('pointer-events', 'auto');})
+	;
 };
 
 dv.redraw.lineLabels = function(country) {
@@ -959,12 +1053,76 @@ dv.redraw.gradients = function(duration) {
 
 
 /* REWRITE: Used for updating the contents of HTML elements */
-dv.rewrite.descr = function(duration) {
-		dv.html.descr.html(dv.opt.text);
-		if (duration) { dv.update.resize(duration); }
+
+// expects {name: dv.html.someName, duration: someNumber, html: someHtml}
+dv.rewrite.fadeInOut = function(o) {
+	if (!o.duration) {
+		o.ele.html(o.html).style('opacity', 1);
+	} else {
+		o.ele.transition().duration(o.duration / 2)
+			.style('opacity', 0)
+			.transition().duration(0).each('end', function() {
+				d3.select(this)
+					.html(o.html)
+					.transition().duration(o.duration / 2)
+						.style('opacity', 1)
+				;
+			})
+		;
+	}
+
+};
+
+
+dv.rewrite.stats = function(duration) {
+	var view = dv.opt.views[dv.state.view],
+		bigNumber;
+
+	bigNumber = dv.format[view.format](dv.data.stats.bigLoss.val);
+	if (view.format !== 'percent') {bigNumber += dv.calc.dif(dv.data.stats.bigLoss);}
+	dv.rewrite.fadeInOut({ele:dv.html.bigLoss.select('.number'), duration:duration, html: bigNumber});
+	dv.rewrite.fadeInOut({ele:dv.html.bigLoss.select('.country'), duration:duration, html: dv.data.stats.bigLoss.name});
+	dv.rewrite.fadeInOut({ele:dv.html.bigLoss.select('.descr'), duration:duration, html: view.bigLoss});
+
+	bigNumber = dv.format[view.format](dv.data.stats.bigGain.val);
+	if (view.format !== 'percent') {bigNumber += dv.calc.dif(dv.data.stats.bigGain);}
+	dv.rewrite.fadeInOut({ele:dv.html.bigGain.select('.number'), duration:duration, html: bigNumber});
+	dv.rewrite.fadeInOut({ele:dv.html.bigGain.select('.country'), duration:duration, html: dv.data.stats.bigGain.name});
+	dv.rewrite.fadeInOut({ele:dv.html.bigGain.select('.descr'), duration:duration, html: view.bigGain});
+
+	bigNumber = dv.format[view.format](dv.data.stats.bigLossYear.val);
+	if (view.format !== 'percent') {bigNumber += dv.calc.dif(dv.data.stats.bigLossYear);}
+	dv.rewrite.fadeInOut({ele:dv.html.bigLossYear.select('.number'), duration:duration, html: bigNumber});
+	dv.rewrite.fadeInOut({ele:dv.html.bigLossYear.select('.country'), duration:duration, html: dv.data.stats.bigLossYear.name + ' (' + dv.data.stats.bigLossYear.year + ')'});
+	dv.rewrite.fadeInOut({ele:dv.html.bigLossYear.select('.descr'), duration:duration, html: view.bigLossYear});
+
+	bigNumber = dv.format[view.format](dv.data.stats.bigGainYear.val);
+	if (view.format !== 'percent') {bigNumber += dv.calc.dif(dv.data.stats.bigGainYear);}
+	dv.rewrite.fadeInOut({ele:dv.html.bigGainYear.select('.number'), duration:duration, html: bigNumber});
+	dv.rewrite.fadeInOut({ele:dv.html.bigGainYear.select('.country'), duration:duration, html: dv.data.stats.bigGainYear.name + ' (' + dv.data.stats.bigGainYear.year + ')'});
+	dv.rewrite.fadeInOut({ele:dv.html.bigGainYear.select('.descr'), duration:duration, html: view.bigGainYear});
 };
 
 /* CALC: Calculate something and return a value */
+
+dv.calc.dif = function(stat) {
+	var first, last, start, end, percent,
+		country = dv.dato.full[stat.name],
+		data = dv.opt.data.label;
+	if (stat.year) {
+		first = dv.data.years.selected[dv.data.years.selected.indexOf(stat.year) - 1];
+		last = stat.year;
+	} else {
+		first = dv.data.years.selected[1];
+		last = dv.data.years.selected[dv.data.years.selected.length - 1];
+	}
+	start = country.data[data][first];
+	end = country.data[data][last];
+
+	percent = Math.round((end - start) / start * 100);
+	percent = ' <span class="pct">(' + percent + '%)</span>';
+	return percent;
+};
 
 // take a start year and an end year and return both of those all all years in between
 dv.calc.years = function(start, end) {
@@ -1006,21 +1164,36 @@ dv.calc.debt = function(country) {
 	return country;
 };
 
-
-/* FORMAT: Take a value and return a string for display */
-dv.format.debt = function(num) {
-	num = Math.round(num);
-	if (num < 1000) { return '$' + num + 'b'; }
-	else {
-		num /= 100;
-		num = Math.round(num)/10;
-		return '$' + num + 'T';
-	}
+dv.calc.nextView = function() {
+	return (dv.state.view + 1) % (dv.opt.views.length);
 };
 
-dv.format.GDP = function(num) {
+
+/* FORMAT: Take a value and return a string for display */
+dv.format.ratio = function(num) {
+	var sign;
+	num = Math.round(num * 100)/100;
+	sign = num > 0 ? '+' : '';
+	return sign + num;
+};
+
+dv.format.percent = function(num) {
 	num = Math.round(num * 100);
+	num = num > 0 ? '+' + num : num;
 	return num + '%';
+};
+
+dv.format.bigDollar = function(num) {
+	var factor = 1,
+		abbvr = "",
+		symbol = '$',
+		abs = Math.abs(num);
+
+	if (abs < 999) { abbvr = "B"; }
+	else { factor = 1000; abbvr =  "T"; }
+	abs = abs > 999 ? Math.round(abs/factor*10)/10 : Math.round(abs/factor);
+	num = num < 0 ? '-' + symbol + abs : '+' + symbol + abs;
+	return num + abbvr;
 };
 
 dv.format.raw = function(num) {
@@ -1068,44 +1241,6 @@ dv.update.loadState = function(change, name) {
 	dv.state[name] = dv.state[name] || 0;
 	dv.state[name] += change;
 	if (dv.state[name] === 0) { dv.postload[name](); }
-};
-
-// creates a hover that can be called by dv.util.hover(event, html), if no event or html is provided, hover is hidden
-dv.hover = dv.hover || {};
-dv.hover.show = function(event, html) {
-	if (!dv.html.hover) { dv.hover.create(); }
-	var x, y, hover, height, width,
-		dim = dv.dim.win,
-		win = dv.html.win,
-		scroll = { x: win.scrollX, y: win.scrollY },
-		opt = dv.opt.hover || {},
-		margin = opt.margin || 10,
-		offset = opt.offset || 10;
-
-	if (event && html) {
-		x = event.clientX + offset;
-		y = event.clientY - offset;
-
-		hover = document.getElementById('hover');
-		dv.html.hover.html(html);
-		height = hover.offsetHeight;
-		width = hover.offsetWidth;
-		if (x + width + margin >= dim.w) { x = x - 2 * offset - width; x = x < scroll.x ? margin : x; }
-		if (y + height + margin >= dim.h) { y = dim.h - margin - height; y = y < scroll.y ? dim.h - height - margin : y; }
-		x += scroll.x;
-		y += scroll.y;
-		dv.html.hover.style('top', y + 'px').style('left', x + 'px');
-		dv.html.hover.transition().style('opacity', 0.95);
-	}
-};
-dv.hover.create = function() {
-	dv.html.hover = d3.select('body').append('div')
-		.attr('id', 'hover')
-		.style('display', 'block')
-		.attr('visibility', 'hidden');
-};
-dv.hover.hide = function() {
-	if (dv.html.hover) { dv.html.hover.transition().style('opacity', 0); }
 };
 
 /* Kick everything off */

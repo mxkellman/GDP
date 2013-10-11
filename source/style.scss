@@ -3,7 +3,9 @@
 
 body {
 	background-color: #f1f1f7;
-	margin: 40px;
+	padding: 20px 40px 20px 40px;
+	margin: 0px;
+	@include box-sizing(border-box);
 }
 
 svg {
@@ -12,7 +14,7 @@ svg {
 		stroke-color: $white;
 	}
 	text {
-		font-weight: $fontWeightLight;
+		font-weight: $fontWeightMedium;
 		fill: $medGray;
 		&.xLabel {
 			font-size: 11px;
@@ -37,38 +39,68 @@ svg {
 	}
 }
 
-h1 {
-	font-weight: 100;
-	border-top: 2px solid #555;
-	padding-top: 10px;
-	width: 90%;
-}
-
-.explanation {
-	margin-bottom: 20px;
-	font-weight: 300;
-	font-size: 14px;
-	line-height: 18px;
-	color: #555;
-	width: 50%;
-}
-
-#hover {
-	padding: 10px;
-	background: $darkGray;
-	border: 1px solid $black;
-	color: $white;
-	z-index: $zTooltip;
-	opacity: 0.0;
-	position: absolute;
-	border-radius: 8px;
-	pointer-events: none;
-
-	ul {
-		padding: 10px 0 0 0;
+.header {
+	h1 {
+		font-weight: 100;
+		border-top: 2px solid #555;
+		padding-top: 10px;
+		width: 90%;	
 	}
+
 	h5 {
 		padding-top: 0px;
-		color: $white;
+		color: $medGray;
+		font-size: $fontSizeM;
+		font-weight: $fontWeightMedium;
+		text-transform: uppercase;
+		float: left;
+		width: 50%
+	}
+
+	.descr {
+		clear: both;
+		margin-bottom: 20px;
+		font-weight: 300;
+		font-size: 14px;
+		line-height: 18px;
+		color: #555;
+		max-width: 700px;
+	}
+	.stats {
+		.stat {
+			float: left;
+			width: 23%;
+			.number {
+				font-size: $fontSizeL;
+				font-weight: $fontWeightMedium;
+				.pct {
+					font-size: $fontSizeM;
+					font-weight: $fontWeightMedium;
+					color: $medGray;
+				}
+			}
+			.country {
+				text-transform: uppercase;
+				font-weight: $fontWeightMedium;
+				font-size: $fontSizeS;
+				color: $medGray;
+			}
+			.descr {
+				margin-top: -3px;
+				font-weight: $fontWeightMedium;
+				font-size: $fontSizeS;
+				color: $medGray;
+			}
+		}
+	}
+	.linkTo {
+		float: right;
+		font-weight: $fontWeightNormal;
+		font-size: $fontSizeS;
+		text-transform: uppercase;
+		cursor: pointer;
+		margin-right: 10%;
+		text-align: right;
+		width: 40%;
 	}
 }

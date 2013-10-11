@@ -129,3 +129,8 @@ ul.inline, ol.inline {
 	background: 			transparent top left no-repeat url('../img/logo.png');
 }
 
+@mixin box-sizing($box-model) {
+  -webkit-box-sizing: $box-model; // Safari <= 5
+     -moz-box-sizing: $box-model; // Firefox <= 19
+          box-sizing: $box-model;
+}
