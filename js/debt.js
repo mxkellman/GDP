@@ -282,11 +282,11 @@ dv.create.dims = function() {
 
 	dv.html.svg = dv.html.svg || dv.draw.svg();
 	dv.dim.svg = {
-		h: dv.dim.win.h - margin.top - margin.bottom - dv.html.svg.offsetTop - dv.dim.body.bottom,
-		w: dv.dim.win.w - margin.left - margin.right - dv.html.svg.offsetLeft - dv.dim.body.right,
+		h: dv.dim.win.h - margin.top - margin.bottom - dv.dim.body.bottom - 100, // - dv.html.svg.offsetTop // SVG doesn't get an offset.  Needs to be wrapped in a div to make it work.  Subbing in "-100" for now.
+		w: dv.dim.win.w - margin.left - margin.right - dv.dim.body.right - 100, // - dv.html.svg.offsetLeft 
 	};
 
-	dv.dim.svg.h = dv.dim.svg.h < mindim.h ? mindim.h : dv.dim.svg.h;
+    dv.dim.svg.h = dv.dim.svg.h < mindim.h ? mindim.h : dv.dim.svg.h;
 	dv.dim.svg.w = dv.dim.svg.w < mindim.w ? mindim.w : dv.dim.svg.w;
 
 	dv.dim.chart = {
@@ -974,7 +974,7 @@ dv.redraw.xLabels = function() {
 		.attr('width', width)
 		.style('font-size', size)
 		.attr('dy', 0)
-		.attr('dx', function(d) { return (dv.scale.x(d-1) + width / 2); })
+		.attr('dx', function(d) { return (dv.scale.x(d-1) + width / 2) | 0; })
 		.style('visibility', function(d, i) {
 			if (i === 0) {
 				return 'hidden';
@@ -1012,7 +1012,7 @@ dv.redraw.lineLabels = function(country) {
 		.attr('class','line-label')
 		.attr('width', width)
 		.style('font-size', size)
-		.attr('dx', function(d, i) { return (dv.scale.x(dv.data.years.selected[i-1]) + width / 2); })
+		.attr('dx', function(d, i) { return (dv.scale.x(dv.data.years.selected[i-1]) + width / 2) | 0; })
 		.attr('dy', function(d) {
 			var height = dv.scale.yHigh(country, d) - 5;
 			if (height < 15) { height = dv.scale.yLow(country, d) + 15; }
